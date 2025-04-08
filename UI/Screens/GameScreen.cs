@@ -187,22 +187,31 @@ namespace AsciiAscendant.UI
                 // Check if skill can be used (not on cooldown)
                 if (skill.CanUse())
                 {
-                    // Apply skill damage to the enemy
-                    _gameState.Player.UseSkill(skillIndex, target);
+                    // Set the skill on cooldown
+                    skill.Use();
                     
-                    Console.WriteLine($"Used {skill.Name} on {target.Name} for {skill.Damage} damage!");
+                    Console.WriteLine($"Used {skill.Name} on {target.Name}");
                     
-                    // Check if enemy was killed
-                    if (!target.IsAlive)
+                    // For Fireball skill, create an animation instead of applying damage directly
+                    if (skill.Name == "Fireball")
                     {
-                        target.Die(_gameState);
-                        Console.WriteLine($"{target.Name} was defeated! Gained {target.ExperienceValue} experience.");
-                        
-                        // Clear the selected enemy since it's now dead
-                        _mapView.SelectEnemy(null);
+                        _gameState.CreateFireballAnimation(_gameState.Player.Position, target, skill.Damage);
                     }
-                    
-                    // We no longer update enemies here - that's handled by the game loop
+                    else
+                    {
+                        // For other skills, apply damage directly
+                        target.TakeDamage(skill.Damage);
+                        
+                        // Check if enemy was killed
+                        if (!target.IsAlive)
+                        {
+                            target.Die(_gameState);
+                            Console.WriteLine($"{target.Name} was defeated! Gained {target.ExperienceValue} experience.");
+                            
+                            // Clear the selected enemy since it's now dead
+                            _mapView.SelectEnemy(null);
+                        }
+                    }
                     
                     // Update UI
                     _statusBar.SetNeedsDisplay();

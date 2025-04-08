@@ -11,8 +11,12 @@ namespace AsciiAscendant.Engine
         private GameState _gameState = null!;
         private GameScreen _gameScreen = null!;
         private Timer _gameLoopTimer = null!;
-        private const int GameTickIntervalMs = 1000; // Update game every 1 second by default
+        private const int GameTickIntervalMs = 100; // Update game every 100ms
         private bool _gameRunning = false;
+        
+        // Track enemy update timing - enemies should update once per second
+        private int _enemyUpdateCounter = 0;
+        private const int EnemyUpdateFrequency = 10; // Update enemies every 10 ticks (10 * 100ms = 1 second)
 
         public void Initialize()
         {
@@ -77,17 +81,25 @@ namespace AsciiAscendant.Engine
         
         private void UpdateGameState()
         {
-            // Update all enemies
-            _gameState.UpdateEnemies();
+            // Update animations and other frequent updates
+            _gameState.UpdateAnimations();
             
-            // Update skill cooldowns
+            // Update enemies less frequently (once per second)
+            _enemyUpdateCounter++;
+            if (_enemyUpdateCounter >= EnemyUpdateFrequency)
+            {
+                // Time to update enemies
+                _gameState.UpdateEnemies();
+                
+                // Reset counter
+                _enemyUpdateCounter = 0;
+            }
+            
+            // Update skill cooldowns every tick
             foreach (var skill in _gameState.Player.Skills)
             {
                 skill.UpdateCooldown();
             }
-            
-            // Add other game state updates here as the game evolves
-            // For example: environmental effects, spawning new enemies, etc.
         }
     }
 }

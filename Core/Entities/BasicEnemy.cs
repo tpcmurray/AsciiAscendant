@@ -10,12 +10,20 @@ namespace AsciiAscendant.Core.Entities
         public BasicEnemy(string name, int maxHealth, int damage, int experienceValue) 
             : base(name, 'E', maxHealth, damage, experienceValue, 8)
         {
-            // Initialize ASCII representation for this enemy type
-            AsciiRepresentation = new List<string>
+            // Initialize idle ASCII representation for this enemy type
+            IdleAscii = new List<string>
             {
                 @"^o_o^",
                 @" /Θ\ ",
-                @"  ┴  "
+                @"  ╨  "
+            };
+            
+            // Initialize movement ASCII representation (slightly different stance)
+            MovementAscii = new List<string>
+            {
+                @"^-_-^",
+                @" /Θ\ ",
+                @" / \  "
             };
         }
         
@@ -23,7 +31,7 @@ namespace AsciiAscendant.Core.Entities
         {
             // If dead, do nothing
             if (!IsAlive) return;
-            
+                        
             // Simple AI: If can see player, move toward player
             if (CanSeePlayer(gameState))
             {
@@ -40,7 +48,7 @@ namespace AsciiAscendant.Core.Entities
                 // Random movement when player not detected
                 RandomMove(gameState.CurrentMap);
             }
-        }
+                    }
         
         private void MoveTowardPlayer(GameState gameState)
         {
@@ -53,6 +61,9 @@ namespace AsciiAscendant.Core.Entities
         
         private void RandomMove(Map map)
         {
+            // Track old position before moving
+            Point oldPosition = Position;
+            
             // Randomly move in one of the cardinal directions
             int direction = _random.Next(4);
             switch (direction)
@@ -61,6 +72,16 @@ namespace AsciiAscendant.Core.Entities
                 case 1: Move(map, 1, 0); break;  // East
                 case 2: Move(map, 0, 1); break;  // South
                 case 3: Move(map, -1, 0); break; // West
+            }
+            
+            // Debug logging to see if we actually moved
+            if (oldPosition.X != Position.X || oldPosition.Y != Position.Y)
+            {
+                Console.WriteLine($"{Name} moved from ({oldPosition.X},{oldPosition.Y}) to ({Position.X},{Position.Y})");
+            }
+            else
+            {
+                IsMoving = false;
             }
         }
         

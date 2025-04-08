@@ -24,7 +24,8 @@ namespace AsciiAscendant.Core.Entities
             
             if (CanMoveTo(map, newX, newY))
             {
-                Position = new Point(newX, newY);
+                // Use MoveTo method instead of setting Position directly
+                MoveTo(map, newX, newY);
             }
         }
         

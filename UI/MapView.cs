@@ -102,6 +102,12 @@ namespace AsciiAscendant.UI
             
             // Draw the player
             DrawCreature(_gameState.Player, false);
+            
+            // Draw all active animations on top
+            foreach (var animation in _gameState.ActiveAnimations)
+            {
+                animation.Draw(this);
+            }
         }
         
         private void DrawCreature(Creature creature, bool isEnemy)
@@ -113,11 +119,12 @@ namespace AsciiAscendant.UI
             Driver.SetAttribute(creature.GetEntityColor());
             
             // Draw the ASCII representation or symbol
-            if (creature.AsciiRepresentation != null && creature.AsciiRepresentation.Count > 0)
+            var currentAscii = creature.CurrentAscii;
+            if (currentAscii != null && currentAscii.Count > 0)
             {
-                for (int yOffset = 0; yOffset < creature.AsciiRepresentation.Count; yOffset++)
+                for (int yOffset = 0; yOffset < currentAscii.Count; yOffset++)
                 {
-                    string line = creature.AsciiRepresentation[yOffset];
+                    string line = currentAscii[yOffset];
                     for (int xOffset = 0; xOffset < line.Length; xOffset++)
                     {
                         int drawX = x + xOffset;
@@ -156,7 +163,8 @@ namespace AsciiAscendant.UI
             
             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
             
-            if (entity.AsciiRepresentation != null && entity.AsciiRepresentation.Count > 0)
+            var currentAscii = entity.CurrentAscii;
+            if (currentAscii != null && currentAscii.Count > 0)
             {
                 // Draw selection brackets to the left and right
                 int leftX = x - 2;

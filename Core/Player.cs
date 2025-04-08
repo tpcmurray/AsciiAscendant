@@ -18,12 +18,20 @@ namespace AsciiAscendant.Core
             Experience = 0;
             Skills = new List<Skill>();
             
-            // Initialize multi-line ASCII representation for the player
-            AsciiRepresentation = new List<string>
+            // Initialize idle ASCII representation for the player
+            IdleAscii = new List<string>
             {
-                @"  σ  ",
-                @" /O\ ",
-                @" / \ "
+                @" σ  ",
+                @"/O\",
+                @" ╨  "
+            };
+            
+            // Initialize movement ASCII representation for the player (running pose)
+            MovementAscii = new List<string>
+            {
+                @" σ  ",
+                @"/O\",
+                @"/ \ "
             };
             
             // Add some basic skills
