@@ -12,6 +12,11 @@ namespace AsciiAscendant.UI
         private StatusBar _statusBar;
         private SkillBar _skillBar;
         private Button _closeButton;
+        private bool _processingKeyPress = false;
+        
+        // Add time-based key handling variables
+        private DateTime _lastKeyPressTime = DateTime.MinValue;
+        private const int KeyPressDelayMs = 150; // Minimum milliseconds between keypresses
         
         public GameScreen(GameState gameState) : base("ASCII Ascendant")
         {
@@ -101,10 +106,29 @@ namespace AsciiAscendant.UI
         
         private void GameScreen_KeyPress(KeyEventEventArgs e)
         {
+            // Only allow keypress if enough time has elapsed since the last one
+            var now = DateTime.Now;
+            var timeSinceLastKeyPress = (now - _lastKeyPressTime).TotalMilliseconds;
+            
+            if (timeSinceLastKeyPress < KeyPressDelayMs)
+            {
+                return; // Ignore this keypress as it's too soon after the previous one
+            }
+            
+            // Update last keypress time
+            _lastKeyPressTime = now;
+            
+            // Check if we're already processing a key press to prevent multiple movements
+            if (_processingKeyPress)
+                return;
+            
+            _processingKeyPress = true;
+            
             // Check for Ctrl+Q to quit the game
             if (e.KeyEvent.Key == Key.Q && e.KeyEvent.IsCtrl)
             {
                 Application.RequestStop();
+                _processingKeyPress = false;
                 return;
             }
             
@@ -164,6 +188,9 @@ namespace AsciiAscendant.UI
                 _skillBar.SetNeedsDisplay();
                 Application.Refresh(); // Force immediate refresh
             }
+            
+            // Reset the flag after processing
+            _processingKeyPress = false;
         }
 
         private void UsePlayerSkill(int skillIndex)

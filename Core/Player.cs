@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Terminal.Gui;
 using AsciiAscendant.Core.Entities;
 
 namespace AsciiAscendant.Core
@@ -20,9 +21,9 @@ namespace AsciiAscendant.Core
             // Initialize multi-line ASCII representation for the player
             AsciiRepresentation = new List<string>
             {
-                "  o  ",
-                " /|\\ ",
-                " / \\ "
+                @"  σ  ",
+                @" /O\ ",
+                @" / \ "
             };
             
             // Add some basic skills
@@ -63,6 +64,12 @@ namespace AsciiAscendant.Core
                     skill.Use();
                 }
             }
+        }
+
+        public override Terminal.Gui.Attribute GetEntityColor()
+        {
+            // Player is white regardless of health
+            return new Terminal.Gui.Attribute(Color.White, Color.Black);
         }
     }
 }

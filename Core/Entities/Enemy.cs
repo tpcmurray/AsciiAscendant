@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Terminal.Gui;
 
 namespace AsciiAscendant.Core.Entities
 {
@@ -44,6 +45,18 @@ namespace AsciiAscendant.Core.Entities
             
             // TODO: Drop loot, play death animation, etc.
             Console.WriteLine($"{Name} has been defeated!");
+        }
+        
+        public override Terminal.Gui.Attribute GetEntityColor()
+        {
+            float healthPercentage = GetHealthPercentage();
+            
+            if (healthPercentage > 0.7f)
+                return new Terminal.Gui.Attribute(Color.Green, Color.Black);
+            else if (healthPercentage > 0.3f)
+                return new Terminal.Gui.Attribute(Color.Brown, Color.Black);
+            else
+                return new Terminal.Gui.Attribute(Color.Red, Color.Black);
         }
     }
 }

@@ -13,9 +13,9 @@ namespace AsciiAscendant.Core.Entities
             // Initialize ASCII representation for this enemy type
             AsciiRepresentation = new List<string>
             {
-                @" /^\ ",
-                 "<o_o>",
-                @" \_/ "
+                @"^o_o^",
+                @" /Θ\ ",
+                @"  ┴  "
             };
         }
         

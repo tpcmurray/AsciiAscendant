@@ -8,7 +8,6 @@ namespace AsciiAscendant.Core.Entities
         public int Health { get; protected set; }
         public int MaxHealth { get; protected set; }
         public int Damage { get; protected set; }
-        public List<string> AsciiRepresentation { get; protected set; }
         
         protected Creature(string name, char symbol, int maxHealth, int damage) 
             : base(name, symbol)
@@ -16,7 +15,6 @@ namespace AsciiAscendant.Core.Entities
             MaxHealth = maxHealth;
             Health = maxHealth;
             Damage = damage;
-            AsciiRepresentation = new List<string>();
         }
         
         public virtual void Move(Map map, int dx, int dy)
@@ -45,5 +43,11 @@ namespace AsciiAscendant.Core.Entities
         }
         
         public bool IsAlive => Health > 0;
+        
+        // Get health percentage for rendering
+        public float GetHealthPercentage()
+        {
+            return (float)Health / MaxHealth;
+        }
     }
 }

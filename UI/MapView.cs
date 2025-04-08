@@ -48,24 +48,12 @@ namespace AsciiAscendant.UI
             return base.MouseEvent(me);
         }
         
-        private bool IsPointInsideEntity(int x, int y, Creature entity)
+        private bool IsPointInsideEntity(int x, int y, Entity entity)
         {
-            if (entity.AsciiRepresentation == null || entity.AsciiRepresentation.Count == 0)
-            {
-                // For simple entities with just a character, check exact position
-                return x == entity.Position.X && y == entity.Position.Y;
-            }
+            var (entityX, entityY, width, height) = entity.GetRenderDimensions();
             
-            // For multi-line ASCII representation, check if point is within the bounds
-            int centerOffsetX = entity.AsciiRepresentation[0].Length / 2;
-            int centerOffsetY = entity.AsciiRepresentation.Count / 2;
-            
-            int minX = entity.Position.X - centerOffsetX;
-            int maxX = minX + entity.AsciiRepresentation[0].Length - 1;
-            int minY = entity.Position.Y - centerOffsetY;
-            int maxY = minY + entity.AsciiRepresentation.Count - 1;
-            
-            return x >= minX && x <= maxX && y >= minY && y <= maxY;
+            return x >= entityX && x < entityX + width && 
+                   y >= entityY && y < entityY + height;
         }
         
         public override void Redraw(Rect bounds)
@@ -91,165 +79,124 @@ namespace AsciiAscendant.UI
                 }
             }
             
-            // Draw all enemies with their ASCII representation
+            // Draw all enemies
             foreach (var enemy in _gameState.Enemies)
             {
-                int enemyX = enemy.Position.X;
-                int enemyY = enemy.Position.Y;
+                // Get enemy render dimensions
+                var (enemyX, enemyY, width, height) = enemy.GetRenderDimensions();
                 
                 // Only draw enemy if within viewport
-                if (enemyX >= bounds.X && enemyX < bounds.X + bounds.Width &&
-                    enemyY >= bounds.Y && enemyY < bounds.Y + bounds.Height)
+                if (enemyX + width > bounds.X && enemyX < bounds.X + bounds.Width &&
+                    enemyY + height > bounds.Y && enemyY < bounds.Y + bounds.Height)
                 {
-                    // Set different colors based on enemy health percentage
-                    var healthPercentage = (float)enemy.Health / enemy.MaxHealth;
-                    Driver.SetAttribute(GetEnemyColor(healthPercentage));
+                    // Draw selection indicators if this is the selected enemy
+                    if (_selectedEnemy == enemy)
+                    {
+                        DrawSelectionIndicator(enemy);
+                    }
                     
-                    // If the enemy has a multi-line representation, draw it
-                    if (enemy.AsciiRepresentation != null && enemy.AsciiRepresentation.Count > 0)
-                    {
-                        // Calculate the starting position to center the enemy's ASCII art
-                        int centerOffsetX = enemy.AsciiRepresentation[0].Length / 2;
-                        int centerOffsetY = enemy.AsciiRepresentation.Count / 2;
-                        
-                        // Draw selection indicators if this is the selected enemy
-                        if (_selectedEnemy == enemy)
-                        {
-                            Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
-                            
-                            // Draw selection brackets to the left and right
-                            int leftX = enemyX - centerOffsetX - 2;
-                            int rightX = enemyX + centerOffsetX + 1;
-                            
-                            for (int y = 0; y < enemy.AsciiRepresentation.Count; y++)
-                            {
-                                int drawY = enemyY - centerOffsetY + y;
-                                
-                                // Draw left bracket
-                                if (leftX >= 0 && leftX < map.Width && drawY >= 0 && drawY < map.Height)
-                                {
-                                    AddRune(leftX, drawY, (Rune)'[');
-                                }
-                                
-                                // Draw right bracket
-                                if (rightX >= 0 && rightX < map.Width && drawY >= 0 && drawY < map.Height)
-                                {
-                                    AddRune(rightX, drawY, (Rune)']');
-                                }
-                            }
-                            
-                            // Reset color for drawing enemy
-                            Driver.SetAttribute(GetEnemyColor(healthPercentage));
-                        }
-                        
-                        for (int y = 0; y < enemy.AsciiRepresentation.Count; y++)
-                        {
-                            string line = enemy.AsciiRepresentation[y];
-                            for (int x = 0; x < line.Length; x++)
-                            {
-                                // Calculate the position relative to the enemy's center
-                                int drawX = enemyX - centerOffsetX + x;
-                                int drawY = enemyY - centerOffsetY + y;
-                                
-                                // Make sure we're within the bounds
-                                if (drawX >= 0 && drawX < map.Width && drawY >= 0 && drawY < map.Height)
-                                {
-                                    AddRune(drawX, drawY, (Rune)line[x]);
-                                }
-                            }
-                        }
-                        
-                        // Draw health bar above enemy
-                        DrawHealthBar(enemyX, enemyY - centerOffsetY - 1, healthPercentage, enemy.Name);
-                    }
-                    else
-                    {
-                        // Draw selection indicators if this is the selected enemy
-                        if (_selectedEnemy == enemy)
-                        {
-                            Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
-                            
-                            // Draw selection brackets to the left and right
-                            if (enemyX - 1 >= 0)
-                                AddRune(enemyX - 1, enemyY, (Rune)'[');
-                            
-                            if (enemyX + 1 < map.Width)
-                                AddRune(enemyX + 1, enemyY, (Rune)']');
-                            
-                            // Reset color for drawing enemy
-                            Driver.SetAttribute(GetEnemyColor(healthPercentage));
-                        }
-                        
-                        // Fallback to single character if no ASCII representation
-                        AddRune(enemyX, enemyY, (Rune)enemy.Symbol);
-                        
-                        // Draw health bar above enemy
-                        DrawHealthBar(enemyX, enemyY - 1, healthPercentage, enemy.Name);
-                    }
+                    // Draw the enemy
+                    DrawCreature(enemy, true);
                 }
             }
             
-            // Draw the player with multi-line ASCII representation
-            var player = _gameState.Player;
-            int playerX = player.Position.X;
-            int playerY = player.Position.Y;
+            // Draw the player
+            DrawCreature(_gameState.Player, false);
+        }
+        
+        private void DrawCreature(Creature creature, bool isEnemy)
+        {
+            // Get creature render dimensions
+            var (x, y, width, height) = creature.GetRenderDimensions();
             
-            // Only draw player if within viewport
-            if (playerX >= bounds.X && playerX < bounds.X + bounds.Width &&
-                playerY >= bounds.Y && playerY < bounds.Y + bounds.Height)
+            // Use the entity's own color method
+            Driver.SetAttribute(creature.GetEntityColor());
+            
+            // Draw the ASCII representation or symbol
+            if (creature.AsciiRepresentation != null && creature.AsciiRepresentation.Count > 0)
             {
-                Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
-                
-                // If the player has a multi-line representation, draw it
-                if (player.AsciiRepresentation != null && player.AsciiRepresentation.Count > 0)
+                for (int yOffset = 0; yOffset < creature.AsciiRepresentation.Count; yOffset++)
                 {
-                    // Calculate the starting position to center the player's ASCII art
-                    int centerOffsetX = player.AsciiRepresentation[0].Length / 2;
-                    int centerOffsetY = player.AsciiRepresentation.Count / 2;
-                    
-                    for (int y = 0; y < player.AsciiRepresentation.Count; y++)
+                    string line = creature.AsciiRepresentation[yOffset];
+                    for (int xOffset = 0; xOffset < line.Length; xOffset++)
                     {
-                        string line = player.AsciiRepresentation[y];
-                        for (int x = 0; x < line.Length; x++)
+                        int drawX = x + xOffset;
+                        int drawY = y + yOffset;
+                        
+                        // Make sure we're within map bounds
+                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
+                            drawY >= 0 && drawY < _gameState.CurrentMap.Height)
                         {
-                            // Calculate the position relative to the player's center
-                            int drawX = playerX - centerOffsetX + x;
-                            int drawY = playerY - centerOffsetY + y;
-                            
-                            // Make sure we're within the bounds
-                            if (drawX >= 0 && drawX < map.Width && drawY >= 0 && drawY < map.Height)
-                            {
-                                AddRune(drawX, drawY, (Rune)line[x]);
-                            }
+                            AddRune(drawX, drawY, (Rune)line[xOffset]);
                         }
                     }
                 }
-                else
+                
+                // Draw health bar for creatures - moved up by one additional row (y-2 instead of y-1)
+                float healthPercentage = creature.GetHealthPercentage();
+                DrawHealthBar(creature.Position.X, y - 2, healthPercentage, creature.Name);
+            }
+            else
+            {
+                // Fallback to single character if no ASCII representation
+                if (x >= 0 && x < _gameState.CurrentMap.Width && y >= 0 && y < _gameState.CurrentMap.Height)
                 {
-                    // Fallback to single character if no ASCII representation
-                    AddRune(playerX, playerY, (Rune)player.Symbol);
+                    AddRune(x, y, (Rune)creature.Symbol);
+                    
+                    // Draw health bar for single-character creatures - moved up by one row
+                    float healthPercentage = creature.GetHealthPercentage();
+                    DrawHealthBar(x, y - 2, healthPercentage, creature.Name);
                 }
             }
         }
         
-        // Get the selected enemy (for skill usage)
-        public Enemy? GetSelectedEnemy()
+        private void DrawSelectionIndicator(Entity entity)
         {
-            return _selectedEnemy;
-        }
-        
-        // Method to select an enemy programmatically (if needed)
-        public void SelectEnemy(Enemy? enemy)
-        {
-            _selectedEnemy = enemy;
-            SetNeedsDisplay();
+            var (x, y, width, height) = entity.GetRenderDimensions();
+            
+            Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
+            
+            if (entity.AsciiRepresentation != null && entity.AsciiRepresentation.Count > 0)
+            {
+                // Draw selection brackets to the left and right
+                int leftX = x - 2;
+                int rightX = x + width + 1;
+                
+                for (int yOffset = 0; yOffset < height; yOffset++)
+                {
+                    int drawY = y + yOffset;
+                    
+                    // Draw left bracket
+                    if (leftX >= 0 && leftX < _gameState.CurrentMap.Width && 
+                        drawY >= 0 && drawY < _gameState.CurrentMap.Height)
+                    {
+                        AddRune(leftX, drawY, (Rune)'[');
+                    }
+                    
+                    // Draw right bracket
+                    if (rightX >= 0 && rightX < _gameState.CurrentMap.Width && 
+                        drawY >= 0 && drawY < _gameState.CurrentMap.Height)
+                    {
+                        AddRune(rightX, drawY, (Rune)']');
+                    }
+                }
+            }
+            else
+            {
+                // Draw selection brackets to the left and right for single-character entities
+                if (x - 1 >= 0 && x - 1 < _gameState.CurrentMap.Width)
+                    AddRune(x - 1, y, (Rune)'[');
+                
+                if (x + 1 >= 0 && x + 1 < _gameState.CurrentMap.Width)
+                    AddRune(x + 1, y, (Rune)']');
+            }
         }
         
         private void DrawHealthBar(int x, int y, float percentage, string name)
         {
             if (y < 0 || y >= _gameState.CurrentMap.Height) return;
             
-            // Draw enemy name
+            // Draw creature name
             string nameDisplay = name.Length <= 10 ? name : name.Substring(0, 10);
             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
             
@@ -299,11 +246,24 @@ namespace AsciiAscendant.UI
         private Terminal.Gui.Attribute GetEnemyColor(float healthPercentage)
         {
             if (healthPercentage > 0.7f)
-                return new Terminal.Gui.Attribute(Color.BrightRed, Color.Black);
+                return new Terminal.Gui.Attribute(Color.Green, Color.Black);
             else if (healthPercentage > 0.3f)
                 return new Terminal.Gui.Attribute(Color.Red, Color.Black);
             else
                 return new Terminal.Gui.Attribute(Color.Red, Color.Black);
+        }
+        
+        // Get the selected enemy (for skill usage)
+        public Enemy? GetSelectedEnemy()
+        {
+            return _selectedEnemy;
+        }
+        
+        // Method to select an enemy programmatically (if needed)
+        public void SelectEnemy(Enemy? enemy)
+        {
+            _selectedEnemy = enemy;
+            SetNeedsDisplay();
         }
         
         private Terminal.Gui.Attribute GetTileColor(Tile tile)
