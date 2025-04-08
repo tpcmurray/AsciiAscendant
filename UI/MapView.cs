@@ -243,16 +243,6 @@ namespace AsciiAscendant.UI
                 return new Terminal.Gui.Attribute(Color.BrightRed, Color.Black);
         }
         
-        private Terminal.Gui.Attribute GetEnemyColor(float healthPercentage)
-        {
-            if (healthPercentage > 0.7f)
-                return new Terminal.Gui.Attribute(Color.Green, Color.Black);
-            else if (healthPercentage > 0.3f)
-                return new Terminal.Gui.Attribute(Color.Red, Color.Black);
-            else
-                return new Terminal.Gui.Attribute(Color.Red, Color.Black);
-        }
-        
         // Get the selected enemy (for skill usage)
         public Enemy? GetSelectedEnemy()
         {

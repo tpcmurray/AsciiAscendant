@@ -132,8 +132,6 @@ namespace AsciiAscendant.UI
                 return;
             }
             
-            bool playerMoved = false;
-            
             // Handle player movement with WASD keys
             switch (e.KeyEvent.Key)
             {
@@ -141,25 +139,21 @@ namespace AsciiAscendant.UI
                     Console.WriteLine($"W key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 0, -1);
                     Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
-                    playerMoved = true;
                     break;
                 case Key.a:
                     Console.WriteLine($"A key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, -1, 0);
                     Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
-                    playerMoved = true;
                     break;
                 case Key.s:
                     Console.WriteLine($"S key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 0, 1);
                     Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
-                    playerMoved = true;
                     break;
                 case Key.d:
                     Console.WriteLine($"D key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 1, 0);
                     Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
-                    playerMoved = true;
                     break;
                 // Number key handlers for using skills
                 case Key.D1:
@@ -170,24 +164,11 @@ namespace AsciiAscendant.UI
                     break;
             }
             
-            // Update enemy turns after player moves
-            if (playerMoved)
-            {
-                // Update all enemies
-                _gameState.UpdateEnemies();
-                
-                // Update cooldowns on skills
-                foreach (var skill in _gameState.Player.Skills)
-                {
-                    skill.UpdateCooldown();
-                }
-                
-                // Update the UI
-                _statusBar.SetNeedsDisplay();
-                _mapView.SetNeedsDisplay();
-                _skillBar.SetNeedsDisplay();
-                Application.Refresh(); // Force immediate refresh
-            }
+            // Update the UI after player moves (but don't update enemies, that happens in the game loop)
+            _statusBar.SetNeedsDisplay();
+            _mapView.SetNeedsDisplay();
+            _skillBar.SetNeedsDisplay();
+            Application.Refresh(); // Force immediate refresh
             
             // Reset the flag after processing
             _processingKeyPress = false;
@@ -221,20 +202,13 @@ namespace AsciiAscendant.UI
                         _mapView.SelectEnemy(null);
                     }
                     
-                    // After using a skill, enemies get a turn
-                    _gameState.UpdateEnemies();
+                    // We no longer update enemies here - that's handled by the game loop
                     
-                    // Update cooldowns on all other skills
-                    foreach (var s in _gameState.Player.Skills)
-                    {
-                        if (s != skill) // We don't need to update the just-used skill
-                            s.UpdateCooldown();
-                    }
-                    
-                    // Update the UI
+                    // Update UI
                     _statusBar.SetNeedsDisplay();
                     _mapView.SetNeedsDisplay();
                     _skillBar.SetNeedsDisplay();
+                    Application.Refresh();
                 }
                 else
                 {
@@ -245,6 +219,18 @@ namespace AsciiAscendant.UI
             {
                 Console.WriteLine("No target selected. Click on an enemy to select it.");
             }
+        }
+
+        // Add method to refresh the display when game state is updated by game loop
+        public void RefreshDisplay()
+        {
+            // Update the UI components
+            _statusBar.SetNeedsDisplay();
+            _mapView.SetNeedsDisplay();
+            _skillBar.SetNeedsDisplay();
+            
+            // Force an immediate refresh of the UI
+            Application.Refresh();
         }
     }
 }
