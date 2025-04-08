@@ -34,11 +34,18 @@ namespace AsciiAscendant.UI
             string expInfo = $"EXP: {player.Experience}/{player.Level * 100}";
             string posInfo = $"Pos: {player.Position.X},{player.Position.Y}";
             
-            // Add status text to the status bar
-            DrawText(0, 0, healthInfo);
-            DrawText(healthInfo.Length + 3, 0, levelInfo);
-            DrawText(healthInfo.Length + levelInfo.Length + 6, 0, expInfo);
-            DrawText(healthInfo.Length + levelInfo.Length + expInfo.Length + 9, 0, posInfo);
+            // Calculate total length of status info
+            int totalLength = healthInfo.Length + levelInfo.Length + expInfo.Length + posInfo.Length + 9; // Spacing between items
+            
+            // Calculate starting position to center the status text
+            int startX = (bounds.Width - totalLength) / 2;
+            if (startX < 0) startX = 0;
+            
+            // Add status text to the status bar, centered
+            DrawText(startX, 0, healthInfo);
+            DrawText(startX + healthInfo.Length + 3, 0, levelInfo);
+            DrawText(startX + healthInfo.Length + levelInfo.Length + 6, 0, expInfo);
+            DrawText(startX + healthInfo.Length + levelInfo.Length + expInfo.Length + 9, 0, posInfo);
         }
         
         private void DrawText(int x, int y, string text)

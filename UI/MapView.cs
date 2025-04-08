@@ -267,7 +267,7 @@ namespace AsciiAscendant.UI
             // Draw health bar below the name
             if (y + 1 < _gameState.CurrentMap.Height)
             {
-                int barWidth = 5;
+                int barWidth = 7;
                 int filledWidth = (int)(barWidth * percentage);
                 
                 // Health bar color based on health percentage

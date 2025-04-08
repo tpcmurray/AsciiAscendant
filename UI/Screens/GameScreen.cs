@@ -10,6 +10,7 @@ namespace AsciiAscendant.UI
         private readonly GameState _gameState;
         private MapView _mapView;
         private StatusBar _statusBar;
+        private SkillBar _skillBar;
         private Button _closeButton;
         
         public GameScreen(GameState gameState) : base("ASCII Ascendant")
@@ -33,28 +34,69 @@ namespace AsciiAscendant.UI
             _closeButton.Clicked += () => Application.RequestStop();
             Add(_closeButton);
             
+            // Create the skill bar (positioned at the bottom)
+            _skillBar = new SkillBar(_gameState);
+            
+            // Create the status bar
+            _statusBar = new StatusBar(_gameState);
+            
             // Create and add the map view
             _mapView = new MapView(_gameState)
             {
                 X = 0,
-                Y = 1, // Leave room for status bar
+                Y = 1, // Start after close button
                 Width = Dim.Fill(),
-                Height = Dim.Fill() - 2 // Leave room for status bar and skill bar
+                Height = Dim.Fill() - 1 // Leave room for close button
             };
             Add(_mapView);
             
-            // Create and add the status bar - now starting after the close button
-            _statusBar = new StatusBar(_gameState)
-            {
-                X = 6, // Position after the close button
-                Y = 0,
-                Width = Dim.Fill() - 4, // Adjusted to leave room for close button
-                Height = 1
-            };
+            // Add the UI components
+            Add(_skillBar);
             Add(_statusBar);
+            
+            // Update layout positions
+            LayoutSubviews();
             
             // Set up key handling for player movement and quit
             KeyPress += GameScreen_KeyPress;
+            
+            // Listen for window resize events
+            Application.Resized += (e) => {
+                LayoutSubviews();
+                Application.Refresh();
+            };
+        }
+        
+        // Override the LayoutSubviews method properly
+        public override void LayoutSubviews()
+        {
+            base.LayoutSubviews();
+            
+            if (_mapView == null || _statusBar == null || _skillBar == null)
+                return;
+            
+            // Get skill bar height as an int
+            int skillBarHeight = _skillBar.GetBarHeight();
+            
+            // Position the skill bar at the bottom of the screen
+            _skillBar.X = 0;
+            _skillBar.Y = Pos.AnchorEnd(skillBarHeight);
+            _skillBar.Width = Dim.Fill();
+            _skillBar.Height = skillBarHeight;
+            
+            // Position the status bar above the skill bar (1 row)
+            _statusBar.X = 0;
+            _statusBar.Y = Pos.AnchorEnd(skillBarHeight + 1);
+            _statusBar.Width = Dim.Fill();
+            _statusBar.Height = 1;
+            
+            // Adjust map view to take remaining space
+            _mapView.Height = Dim.Fill() - skillBarHeight - 2; // Top bar + skill bar + status bar
+            
+            // Update the display
+            _mapView.SetNeedsDisplay();
+            _statusBar.SetNeedsDisplay();
+            _skillBar.SetNeedsDisplay();
         }
         
         private void GameScreen_KeyPress(KeyEventEventArgs e)
@@ -95,7 +137,7 @@ namespace AsciiAscendant.UI
                     Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     playerMoved = true;
                     break;
-                // Add number key handlers for using skills
+                // Number key handlers for using skills
                 case Key.D1:
                 case Key.D2:
                 case Key.D3:
@@ -110,9 +152,16 @@ namespace AsciiAscendant.UI
                 // Update all enemies
                 _gameState.UpdateEnemies();
                 
+                // Update cooldowns on skills
+                foreach (var skill in _gameState.Player.Skills)
+                {
+                    skill.UpdateCooldown();
+                }
+                
                 // Update the UI
                 _statusBar.SetNeedsDisplay();
                 _mapView.SetNeedsDisplay();
+                _skillBar.SetNeedsDisplay();
                 Application.Refresh(); // Force immediate refresh
             }
         }
@@ -148,9 +197,17 @@ namespace AsciiAscendant.UI
                     // After using a skill, enemies get a turn
                     _gameState.UpdateEnemies();
                     
+                    // Update cooldowns on all other skills
+                    foreach (var s in _gameState.Player.Skills)
+                    {
+                        if (s != skill) // We don't need to update the just-used skill
+                            s.UpdateCooldown();
+                    }
+                    
                     // Update the UI
                     _statusBar.SetNeedsDisplay();
                     _mapView.SetNeedsDisplay();
+                    _skillBar.SetNeedsDisplay();
                 }
                 else
                 {
