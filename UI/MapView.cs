@@ -2,6 +2,7 @@ using System;
 using Terminal.Gui;
 using AsciiAscendant.Core;
 using AsciiAscendant.Core.Entities;
+using AsciiAscendant.Core.Animations;
 
 namespace AsciiAscendant.UI
 {

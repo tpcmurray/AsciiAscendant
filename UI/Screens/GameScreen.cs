@@ -2,6 +2,7 @@ using System;
 using Terminal.Gui;
 using AsciiAscendant.Core;
 using AsciiAscendant.Core.Entities;
+using AsciiAscendant.Core.Animations;
 
 namespace AsciiAscendant.UI
 {
@@ -192,10 +193,14 @@ namespace AsciiAscendant.UI
                     
                     Console.WriteLine($"Used {skill.Name} on {target.Name}");
                     
-                    // For Fireball skill, create an animation instead of applying damage directly
+                    // Check skill name to determine what type of animation to create
                     if (skill.Name == "Fireball")
                     {
                         _gameState.CreateFireballAnimation(_gameState.Player.Position, target, skill.Damage);
+                    }
+                    else if (skill.Name == "Arrow Shot") 
+                    {
+                        _gameState.CreateArrowAnimation(_gameState.Player.Position, target, skill.Damage);
                     }
                     else
                     {

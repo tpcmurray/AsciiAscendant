@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AsciiAscendant.Core.Animations;
 using AsciiAscendant.Core.Entities;
 
 namespace AsciiAscendant.Core
@@ -96,13 +97,6 @@ namespace AsciiAscendant.Core
                 // Remove completed animations
                 if (animation.IsCompleted)
                 {
-                    // Check if this is a projectile that hits its target
-                    if (animation is ProjectileAnimation projectile && projectile.Target != null)
-                    {
-                        // Apply the projectile's effect
-                        projectile.ApplyEffect();
-                    }
-                    
                     ActiveAnimations.RemoveAt(i);
                 }
             }
@@ -124,144 +118,20 @@ namespace AsciiAscendant.Core
         
         public void CreateFireballAnimation(Point source, Enemy target, int damage)
         {
-            // Create a new fireball projectile animation
-            var fireball = new ProjectileAnimation(
-                source, 
-                target.Position,
-                '*',
-                new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black),
-                100, // Move one step every 200ms
-                target,
-                damage
-            );
+            // Create a new fireball animation using our specialized class
+            var fireball = new FireballAnimation(source, target.Position, target, damage);
             
             // Add to active animations
             ActiveAnimations.Add(fireball);
         }
-    }
-    
-    public abstract class Animation
-    {
-        public bool IsCompleted { get; protected set; }
         
-        public abstract void Update();
-        public abstract void Draw(Terminal.Gui.View view);
-    }
-    
-    public class ProjectileAnimation : Animation
-    {
-        public Point CurrentPosition { get; private set; }
-        public Point TargetPosition { get; private set; }
-        public char Symbol { get; private set; }
-        public Terminal.Gui.Attribute Color { get; private set; }
-        public Enemy? Target { get; private set; }
-        public int Damage { get; private set; }
-        
-        private readonly int _updateIntervalMs;
-        private readonly double _directionX;  // Changed to double for more precise movement
-        private readonly double _directionY;  // Changed to double for more precise movement
-        private readonly double _moveStep;
-        private double _accumulatedTime;
-        private DateTime _lastUpdateTime;
-        private double _currentX;  // Use double for fractional positions
-        private double _currentY;  // Use double for fractional positions
-        
-        public ProjectileAnimation(Point source, Point target, char symbol, Terminal.Gui.Attribute color, int updateIntervalMs, Enemy? targetEnemy = null, int damage = 0)
+        public void CreateArrowAnimation(Point source, Enemy target, int damage)
         {
-            CurrentPosition = source;
-            TargetPosition = target;
-            Symbol = symbol;
-            Color = color;
-            _updateIntervalMs = updateIntervalMs;
-            _lastUpdateTime = DateTime.Now;
-            Target = targetEnemy;
-            Damage = damage;
+            // Create a new arrow animation using our specialized class
+            var arrow = new ArrowAnimation(source, target.Position, target, damage);
             
-            // Store initial position as double for precise movement
-            _currentX = source.X;
-            _currentY = source.Y;
-            
-            // Calculate direction vector
-            int dx = target.X - source.X;
-            int dy = target.Y - source.Y;
-            double distance = Math.Sqrt(dx * dx + dy * dy);
-            
-            if (distance > 0)
-            {
-                // Store normalized direction vector as doubles
-                _directionX = dx / distance;
-                _directionY = dy / distance;
-                _moveStep = 1.0; // One unit per step
-            }
-            else
-            {
-                _directionX = 0;
-                _directionY = 0;
-                _moveStep = 0;
-                IsCompleted = true;
-            }
-            
-            // Debug output to help diagnose movement issues
-            Console.WriteLine($"Created fireball: From ({source.X},{source.Y}) to ({target.X},{target.Y})");
-            Console.WriteLine($"Direction: ({_directionX:F2},{_directionY:F2}), Step: {_moveStep}");
-        }
-        
-        public override void Update()
-        {
-            var now = DateTime.Now;
-            _accumulatedTime += (now - _lastUpdateTime).TotalMilliseconds;
-            _lastUpdateTime = now;
-            
-            // Check if it's time to move the projectile
-            while (_accumulatedTime >= _updateIntervalMs)
-            {
-                // Move in direction of target using floating point positions
-                _currentX += _directionX * _moveStep;
-                _currentY += _directionY * _moveStep;
-                
-                // Update the displayed position
-                CurrentPosition = new Point((int)Math.Round(_currentX), (int)Math.Round(_currentY));
-                
-                // Debug movement
-                Console.WriteLine($"Fireball moved to: ({CurrentPosition.X},{CurrentPosition.Y})");
-                
-                // Check if reached target
-                if (ReachedTarget())
-                {
-                    IsCompleted = true;
-                    Console.WriteLine("Fireball reached target!");
-                    break;
-                }
-                
-                _accumulatedTime -= _updateIntervalMs;
-            }
-        }
-        
-        private bool ReachedTarget()
-        {
-            // Check if we've reached or passed the target
-            return Math.Abs(CurrentPosition.X - TargetPosition.X) <= 1 && 
-                   Math.Abs(CurrentPosition.Y - TargetPosition.Y) <= 1;
-        }
-        
-        public void ApplyEffect()
-        {
-            // Apply damage to target
-            if (Target != null && Target.IsAlive)
-            {
-                Target.TakeDamage(Damage);
-                Console.WriteLine($"Fireball hit {Target.Name} for {Damage} damage!");
-            }
-        }
-        
-        public override void Draw(Terminal.Gui.View view)
-        {
-            // Only draw if position is valid
-            if (CurrentPosition.X >= 0 && CurrentPosition.Y >= 0)
-            {
-                Terminal.Gui.Application.Driver.SetAttribute(Color);
-                view.AddRune(CurrentPosition.X, CurrentPosition.Y, (Rune)Symbol);
-            }
+            // Add to active animations
+            ActiveAnimations.Add(arrow);
         }
     }
 }

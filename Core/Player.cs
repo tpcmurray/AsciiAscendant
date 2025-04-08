@@ -37,6 +37,7 @@ namespace AsciiAscendant.Core
             // Add some basic skills
             Skills.Add(new Skill("Slash", 5, 1));
             Skills.Add(new Skill("Fireball", 15, 3));
+            Skills.Add(new Skill("Arrow Shot", 8, 2));
         }
         
         public void GainExperience(int amount)
