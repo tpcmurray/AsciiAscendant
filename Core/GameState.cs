@@ -130,7 +130,7 @@ namespace AsciiAscendant.Core
                 target.Position,
                 '*',
                 new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black),
-                200, // Move one step every 200ms
+                100, // Move one step every 200ms
                 target,
                 damage
             );
