@@ -10,15 +10,15 @@ namespace AsciiAscendant.Core.Animations
             : base(
                 source, 
                 target, 
-                '*', // Fireball symbol
+                '✸', // Fireball symbol
                 new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black), // Red color
-                100, // Update speed (ms)
+                50, // Update speed (ms)
                 targetEnemy,
                 damage)
         {
             // Log creation for debugging purposes
-            Console.WriteLine($"Created fireball: From ({source.X},{source.Y}) to ({target.X},{target.Y})");
-            Console.WriteLine($"Direction: ({DirectionX:F2},{DirectionY:F2}), Step: {MoveStep}");
+            // Console.WriteLine($"Created fireball: From ({source.X},{source.Y}) to ({target.X},{target.Y})");
+            // Console.WriteLine($"Direction: ({DirectionX:F2},{DirectionY:F2}), Step: {MoveStep}");
         }
         
         public override void Update()
@@ -28,13 +28,13 @@ namespace AsciiAscendant.Core.Animations
             // Debug movement - specific to fireball for now
             if (!IsCompleted)
             {
-                Console.WriteLine($"Fireball moved to: ({CurrentPosition.X},{CurrentPosition.Y})");
+                // Console.WriteLine($"Fireball moved to: ({CurrentPosition.X},{CurrentPosition.Y})");
             }
         }
         
         protected override void OnTargetReached()
         {
-            Console.WriteLine("Fireball reached target!");
+            // Console.WriteLine("Fireball reached target!");
             base.OnTargetReached();
         }
         
@@ -45,7 +45,7 @@ namespace AsciiAscendant.Core.Animations
             // Add fireball-specific effect (like logging)
             if (Target != null && Target.IsAlive)
             {
-                Console.WriteLine($"Fireball hit {Target.Name} for {Damage} damage!");
+                // Console.WriteLine($"Fireball hit {Target.Name} for {Damage} damage!");
             }
         }
     }

@@ -3,6 +3,7 @@ using Terminal.Gui;
 using AsciiAscendant.Core;
 using AsciiAscendant.Core.Entities;
 using AsciiAscendant.Core.Animations;
+using AsciiAscendant.Core.Loot;
 
 namespace AsciiAscendant.UI
 {
@@ -36,7 +37,7 @@ namespace AsciiAscendant.UI
                     if (enemy.IsAlive && IsPointInsideEntity(mouseX, mouseY, enemy))
                     {
                         _selectedEnemy = enemy;
-                        Console.WriteLine($"Selected enemy: {enemy.Name}");
+                        // Console.WriteLine($"Selected enemy: {enemy.Name}");
                         break;
                     }
                 }
@@ -77,6 +78,20 @@ namespace AsciiAscendant.UI
                         Driver.SetAttribute(GetTileColor(tile));
                         AddRune(x, y, (Rune)symbol);
                     }
+                }
+            }
+            
+            // Draw dropped items
+            foreach (var item in _gameState.DroppedItems)
+            {
+                // Get item render dimensions
+                var (itemX, itemY, width, height) = item.GetRenderDimensions();
+                
+                // Only draw item if within viewport
+                if (itemX + width > bounds.X && itemX < bounds.X + bounds.Width &&
+                    itemY + height > bounds.Y && itemY < bounds.Y + bounds.Height)
+                {
+                    DrawItem(item);
                 }
             }
             
@@ -154,6 +169,45 @@ namespace AsciiAscendant.UI
                     // Draw health bar for single-character creatures - moved up by one row
                     float healthPercentage = creature.GetHealthPercentage();
                     DrawHealthBar(x, y - 2, healthPercentage, creature.Name);
+                }
+            }
+        }
+        
+        private void DrawItem(Item item)
+        {
+            // Get item render dimensions
+            var (x, y, width, height) = item.GetRenderDimensions();
+            
+            // Use the item's own color method
+            Driver.SetAttribute(item.GetEntityColor());
+            
+            // Draw the ASCII representation or symbol
+            var currentAscii = item.CurrentAscii;
+            if (currentAscii != null && currentAscii.Count > 0)
+            {
+                for (int yOffset = 0; yOffset < currentAscii.Count; yOffset++)
+                {
+                    string line = currentAscii[yOffset];
+                    for (int xOffset = 0; xOffset < line.Length; xOffset++)
+                    {
+                        int drawX = x + xOffset;
+                        int drawY = y + yOffset;
+                        
+                        // Make sure we're within map bounds
+                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
+                            drawY >= 0 && drawY < _gameState.CurrentMap.Height)
+                        {
+                            AddRune(drawX, drawY, (Rune)line[xOffset]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Fallback to single character if no ASCII representation
+                if (x >= 0 && x < _gameState.CurrentMap.Width && y >= 0 && y < _gameState.CurrentMap.Height)
+                {
+                    AddRune(x, y, (Rune)item.Symbol);
                 }
             }
         }

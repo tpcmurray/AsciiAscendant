@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AsciiAscendant.Core.Animations;
 using AsciiAscendant.Core.Entities;
+using AsciiAscendant.Core.Loot;
 
 namespace AsciiAscendant.Core
 {
@@ -11,6 +12,7 @@ namespace AsciiAscendant.Core
         public Map CurrentMap { get; private set; }
         public List<Enemy> Enemies { get; private set; }
         public List<Animation> ActiveAnimations { get; private set; }
+        public List<Item> DroppedItems { get; private set; }
         
         public GameState()
         {
@@ -27,6 +29,9 @@ namespace AsciiAscendant.Core
             
             // Initialize animations list
             ActiveAnimations = new List<Animation>();
+            
+            // Initialize dropped items list
+            DroppedItems = new List<Item>();
             
             // Add some test enemies
             SpawnInitialEnemies();
@@ -86,6 +91,65 @@ namespace AsciiAscendant.Core
             }
         }
         
+        // Dropped items management
+        public void AddDroppedItem(Item item)
+        {
+            DroppedItems.Add(item);
+        }
+        
+        public void RemoveDroppedItem(Item item)
+        {
+            DroppedItems.Remove(item);
+        }
+        
+        // Check if there are any items at a given position
+        public List<Item> GetItemsAtPosition(int x, int y)
+        {
+            List<Item> itemsAtPosition = new List<Item>();
+            
+            foreach (var item in DroppedItems)
+            {
+                if (item.Position.X == x && item.Position.Y == y)
+                {
+                    itemsAtPosition.Add(item);
+                }
+            }
+            
+            return itemsAtPosition;
+        }
+        
+        // Try to pick up an item at the player's position
+        public List<Item> AttemptItemPickup()
+        {
+            List<Item> itemsAtPlayerPos = GetItemsAtPosition(Player.Position.X, Player.Position.Y);
+            List<Item> pickedUpItems = new List<Item>();
+            
+            foreach (var item in itemsAtPlayerPos)
+            {
+                // Try to add item to player's inventory
+                if (Player.AddItemToInventory(item))
+                {
+                    // Remove item from the world
+                    DroppedItems.Remove(item);
+                    pickedUpItems.Add(item);
+                    // Console.WriteLine($"Picked up: {item.Name}");
+                }
+                else
+                {
+                    // Console.WriteLine("Inventory is full!");
+                    break; // Stop trying to pick up more items if inventory is full
+                }
+            }
+            
+            return pickedUpItems;
+        }
+        
+        // Update a specific item's position (e.g., dropping an item)
+        public void UpdateItemPosition(Item item, int x, int y)
+        {
+            item.MoveTo(CurrentMap, x, y);
+        }
+        
         public void UpdateAnimations()
         {
             // Update all active animations
@@ -111,7 +175,7 @@ namespace AsciiAscendant.Core
                 // Debug logging for enemy animation states
                 if (enemy.IsMoving)
                 {
-                    Console.WriteLine($"Enemy {enemy.Name} is in movement state during animation update");
+                    // Console.WriteLine($"Enemy {enemy.Name} is in movement state during animation update");
                 }
             }
         }
@@ -132,6 +196,18 @@ namespace AsciiAscendant.Core
             
             // Add to active animations
             ActiveAnimations.Add(arrow);
+        }
+        
+        // Combine regeneration of stamina and tick-based updates
+        public void UpdateGameTick()
+        {
+            // Regenerate player stamina
+            Player.RegenerateStamina(1); // Regenerate 1 stamina per tick
+            
+            // Update animations
+            UpdateAnimations();
+            
+            // Other tick-based updates could go here
         }
     }
 }

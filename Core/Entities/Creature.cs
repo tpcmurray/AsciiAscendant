@@ -8,6 +8,7 @@ namespace AsciiAscendant.Core.Entities
         public int Health { get; protected set; }
         public int MaxHealth { get; protected set; }
         public int Damage { get; protected set; }
+        public int Level { get; protected set; } = 1; // Default level is 1
         
         protected Creature(string name, char symbol, int maxHealth, int damage) 
             : base(name, symbol)
@@ -15,6 +16,7 @@ namespace AsciiAscendant.Core.Entities
             MaxHealth = maxHealth;
             Health = maxHealth;
             Damage = damage;
+            Level = 1;
         }
         
         public virtual void Move(Map map, int dx, int dy)

@@ -3,6 +3,7 @@ using Terminal.Gui;
 using AsciiAscendant.Core;
 using AsciiAscendant.Core.Entities;
 using AsciiAscendant.Core.Animations;
+using AsciiAscendant.UI.Screens;
 
 namespace AsciiAscendant.UI
 {
@@ -18,6 +19,12 @@ namespace AsciiAscendant.UI
         // Add time-based key handling variables
         private DateTime _lastKeyPressTime = DateTime.MinValue;
         private const int KeyPressDelayMs = 150; // Minimum milliseconds between keypresses
+        
+        // Reference to the inventory screen
+        private InventoryScreen _inventoryScreen;
+        
+        // Flag to prevent multiple inventory screens
+        private bool _isInventoryOpen = false;
         
         public GameScreen(GameState gameState) : base("ASCII Ascendant")
         {
@@ -60,11 +67,15 @@ namespace AsciiAscendant.UI
             Add(_skillBar);
             Add(_statusBar);
             
+            // Create inventory screen (doesn't add it to UI yet)
+            _inventoryScreen = new InventoryScreen(_gameState);
+            
             // Update layout positions
             LayoutSubviews();
             
             // Set up key handling for player movement and quit
             KeyPress += GameScreen_KeyPress;
+            KeyUp += GameScreen_KeyUp;
             
             // Listen for window resize events
             Application.Resized += (e) => {
@@ -125,38 +136,21 @@ namespace AsciiAscendant.UI
             
             _processingKeyPress = true;
             
-            // Check for Ctrl+Q to quit the game
-            if (e.KeyEvent.Key == Key.Q && e.KeyEvent.IsCtrl)
-            {
-                Application.RequestStop();
-                _processingKeyPress = false;
-                return;
-            }
-            
             // Handle player movement with WASD keys
             switch (e.KeyEvent.Key)
             {
                 case Key.w:
-                    Console.WriteLine($"W key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 0, -1);
-                    Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     break;
                 case Key.a:
-                    Console.WriteLine($"A key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, -1, 0);
-                    Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     break;
                 case Key.s:
-                    Console.WriteLine($"S key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 0, 1);
-                    Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     break;
                 case Key.d:
-                    Console.WriteLine($"D key pressed. Current position: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     _gameState.Player.Move(_gameState.CurrentMap, 1, 0);
-                    Console.WriteLine($"After Move call: {_gameState.Player.Position.X},{_gameState.Player.Position.Y}");
                     break;
-                // Number key handlers for using skills
                 case Key.D1:
                 case Key.D2:
                 case Key.D3:
@@ -165,14 +159,37 @@ namespace AsciiAscendant.UI
                     break;
             }
             
-            // Update the UI after player moves (but don't update enemies, that happens in the game loop)
             _statusBar.SetNeedsDisplay();
             _mapView.SetNeedsDisplay();
             _skillBar.SetNeedsDisplay();
             Application.Refresh(); // Force immediate refresh
             
-            // Reset the flag after processing
             _processingKeyPress = false;
+        }
+
+
+        private void GameScreen_KeyUp(KeyEventEventArgs e)
+        {
+            // Check for Ctrl+Q to quit the game
+            if (e.KeyEvent.Key == Key.Q && e.KeyEvent.IsCtrl)
+            {
+                Application.RequestStop();
+                return;
+            }
+            
+            // Handle inventory toggle with 'I' key
+            if (e.KeyEvent.Key == Key.i || e.KeyEvent.Key == Key.I)
+            {
+                OpenInventory();
+                return;
+            }
+            
+            // Handle item pickup with Space key
+            if (e.KeyEvent.Key == Key.Space)
+            {
+                PickupItems();
+                return;
+            }
         }
 
         private void UsePlayerSkill(int skillIndex)
@@ -191,7 +208,7 @@ namespace AsciiAscendant.UI
                     // Set the skill on cooldown
                     skill.Use();
                     
-                    Console.WriteLine($"Used {skill.Name} on {target.Name}");
+                    // Console.WriteLine($"Used {skill.Name} on {target.Name}");
                     
                     // Check skill name to determine what type of animation to create
                     if (skill.Name == "Fireball")
@@ -211,7 +228,7 @@ namespace AsciiAscendant.UI
                         if (!target.IsAlive)
                         {
                             target.Die(_gameState);
-                            Console.WriteLine($"{target.Name} was defeated! Gained {target.ExperienceValue} experience.");
+                            // Console.WriteLine($"{target.Name} was defeated! Gained {target.ExperienceValue} experience.");
                             
                             // Clear the selected enemy since it's now dead
                             _mapView.SelectEnemy(null);
@@ -226,12 +243,73 @@ namespace AsciiAscendant.UI
                 }
                 else
                 {
-                    Console.WriteLine($"{skill.Name} is on cooldown. {skill.CurrentCooldown} turns remaining.");
+                    // Console.WriteLine($"{skill.Name} is on cooldown. {skill.CurrentCooldown} turns remaining.");
                 }
             }
             else if (target == null)
             {
-                Console.WriteLine("No target selected. Click on an enemy to select it.");
+                // Console.WriteLine("No target selected. Click on an enemy to select it.");
+            }
+        }
+
+        private void OpenInventory()
+        {
+            // Set flag to indicate inventory is open
+            _isInventoryOpen = true;
+            
+            // Create a new dialog each time to ensure clean state
+            var dialog = new Dialog()
+            {
+                Title = "Inventory",
+                Width = Dim.Percent(80),
+                Height = Dim.Percent(80),
+                Border = new Border() 
+                {
+                    BorderStyle = BorderStyle.Single
+                }
+            };
+            
+            // Create a new inventory screen instance each time
+            _inventoryScreen = new InventoryScreen(_gameState);
+            _inventoryScreen.LoadInventory();
+            
+            // Add the inventory screen to the dialog
+            dialog.Add(_inventoryScreen);
+            
+            // ONE handler for the Escape key that will close immediately
+            dialog.KeyPress += (e) => {
+                if (e.KeyEvent.Key == Key.Esc)
+                {
+                    // When the dialog closes with Escape, reset our flag
+                    _isInventoryOpen = false;
+                    Application.RequestStop();
+                    e.Handled = true;
+                }
+            };
+            
+            // Show the dialog as a modal
+            Application.Run(dialog);
+            
+            // After closing inventory, reset flag (in case it wasn't reset by the event handlers)
+            _isInventoryOpen = false;
+            
+            // Refresh the game screen
+            _mapView.SetNeedsDisplay();
+            _statusBar.SetNeedsDisplay();
+            _skillBar.SetNeedsDisplay();
+            Application.Refresh();
+        }
+        
+        private void PickupItems()
+        {
+            // Try to pick up items at the player's position
+            var pickedUpItems = _gameState.AttemptItemPickup();
+            
+            if (pickedUpItems.Count > 0)
+            {
+                // Items were picked up - refresh the display
+                _mapView.SetNeedsDisplay();
+                Application.Refresh();
             }
         }
 

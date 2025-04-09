@@ -73,16 +73,17 @@ namespace AsciiAscendant.Engine
                     _gameScreen.RefreshDisplay();
                 });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error in game loop: {ex.Message}");
+                // Exception handling without using the variable
+                // We could log errors here in the future if needed
             }
         }
         
         private void UpdateGameState()
         {
-            // Update animations and other frequent updates
-            _gameState.UpdateAnimations();
+            // Use the new UpdateGameTick for stamina regeneration and animations
+            _gameState.UpdateGameTick();
             
             // Update enemies less frequently (once per second)
             _enemyUpdateCounter++;

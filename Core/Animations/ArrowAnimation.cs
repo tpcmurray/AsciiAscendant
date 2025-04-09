@@ -12,14 +12,14 @@ namespace AsciiAscendant.Core.Animations
                 target, 
                 '→', // Default arrow symbol (will be rotated based on direction)
                 new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Black), // White color
-                80, // Update speed (ms) - faster than fireball
+                40, // Update speed (ms) - faster than fireball
                 targetEnemy,
                 damage)
         {
             // Update the arrow symbol based on the direction
             UpdateArrowSymbol();
             
-            Console.WriteLine($"Created arrow: From ({source.X},{source.Y}) to ({target.X},{target.Y})");
+            // Console.WriteLine($"Created arrow: From ({source.X},{source.Y}) to ({target.X},{target.Y})");
         }
         
         private void UpdateArrowSymbol()
@@ -56,13 +56,13 @@ namespace AsciiAscendant.Core.Animations
             // Debug movement
             if (!IsCompleted)
             {
-                Console.WriteLine($"Arrow moved to: ({CurrentPosition.X},{CurrentPosition.Y})");
+                // Console.WriteLine($"Arrow moved to: ({CurrentPosition.X},{CurrentPosition.Y})");
             }
         }
         
         protected override void OnTargetReached()
         {
-            Console.WriteLine("Arrow hit target!");
+            // Console.WriteLine("Arrow hit target!");
             base.OnTargetReached();
         }
         
@@ -73,7 +73,7 @@ namespace AsciiAscendant.Core.Animations
             // Add arrow-specific effect
             if (Target != null && Target.IsAlive)
             {
-                Console.WriteLine($"Arrow hit {Target.Name} for {Damage} damage!");
+                // Console.WriteLine($"Arrow hit {Target.Name} for {Damage} damage!");
             }
         }
     }

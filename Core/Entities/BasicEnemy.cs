@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AsciiAscendant.Core.Loot;
 
 namespace AsciiAscendant.Core.Entities
 {
@@ -25,6 +26,18 @@ namespace AsciiAscendant.Core.Entities
                 @" /Θ\ ",
                 @" / \  "
             };
+            
+            // Set level to 1 by default
+            Level = 1;
+        }
+        
+        protected override void SetupLootTable()
+        {
+            // Add possible loot drops with their chances
+            LootTable.AddEntry("Sword", ItemType.Weapon, 0.3f);
+            LootTable.AddEntry("Leather Armor", ItemType.Armor, 0.2f);
+            LootTable.AddEntry("Health Potion", ItemType.Consumable, 0.5f);
+            LootTable.AddEntry("Ring", ItemType.Accessory, 0.1f);
         }
         
         public override void TakeTurn(GameState gameState)
@@ -77,7 +90,7 @@ namespace AsciiAscendant.Core.Entities
             // Debug logging to see if we actually moved
             if (oldPosition.X != Position.X || oldPosition.Y != Position.Y)
             {
-                Console.WriteLine($"{Name} moved from ({oldPosition.X},{oldPosition.Y}) to ({Position.X},{Position.Y})");
+                //// Console.WriteLine($"{Name} moved from ({oldPosition.X},{oldPosition.Y}) to ({Position.X},{Position.Y})");
             }
             else
             {
