@@ -17,9 +17,15 @@ namespace AsciiAscendant.Engine
         // Track enemy update timing - enemies should update once per second
         private int _enemyUpdateCounter = 0;
         private const int EnemyUpdateFrequency = 10; // Update enemies every 10 ticks (10 * 100ms = 1 second)
+        
+        // Track regeneration timing - should regenerate once per second
+        private int _regenerationCounter = 0;
+        private const int RegenerationFrequency = 10; // Regenerate every 10 ticks (10 * 100ms = 1 second)
 
         public void Initialize()
-        {
+        {         
+            Terminal.Gui.Application.Init();
+            
             // Initialize game state
             _gameState = new GameState();
             
@@ -96,11 +102,36 @@ namespace AsciiAscendant.Engine
                 _enemyUpdateCounter = 0;
             }
             
+            // Update health and stamina regeneration less frequently (once per second)
+            _regenerationCounter++;
+            if (_regenerationCounter >= RegenerationFrequency)
+            {
+                // Time to regenerate health and stamina
+                _gameState.Player.RegenerateHealth();
+                _gameState.Player.RegenerateStamina();
+                
+                // Reset counter
+                _regenerationCounter = 0;
+            }
+            
             // Update skill cooldowns every tick
             foreach (var skill in _gameState.Player.Skills)
             {
                 skill.UpdateCooldown();
             }
+        }
+
+        // Add these P/Invoke methods at the class level
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        private static void SetConsoleFont(IntPtr handle, string fontName, short fontSize)
+        {
+            // This is a simplified approach - in a real implementation, you'd use 
+            // P/Invoke to call SetCurrentConsoleFontEx with the desired font settings
+            
+            // For demonstration purposes only - needs actual P/Invoke implementation
+            Console.WriteLine($"Setting console font to {fontName}, {fontSize}pt");
         }
     }
 }

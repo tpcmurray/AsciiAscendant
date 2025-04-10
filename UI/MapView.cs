@@ -119,10 +119,58 @@ namespace AsciiAscendant.UI
             // Draw the player
             DrawCreature(_gameState.Player, false);
             
+            // Draw damage numbers for creatures
+            foreach (var enemy in _gameState.Enemies)
+            {
+                if (enemy.ActiveDamageNumbers.Count > 0)
+                {
+                    DrawDamageNumbers(enemy);
+                }
+            }
+            
+            // Draw player damage numbers
+            if (_gameState.Player.ActiveDamageNumbers.Count > 0)
+            {
+                DrawDamageNumbers(_gameState.Player);
+            }
+            
             // Draw all active animations on top
             foreach (var animation in _gameState.ActiveAnimations)
             {
                 animation.Draw(this);
+            }
+        }
+        
+        private void DrawDamageNumbers(Creature creature)
+        {
+            foreach (var damageNumber in creature.ActiveDamageNumbers)
+            {
+                // Calculate position with rising effect
+                int x = damageNumber.Position.X;
+                int y = (int)(damageNumber.Position.Y - damageNumber.YOffset);
+                
+                // Make sure we're within map bounds
+                if (x >= 0 && x < _gameState.CurrentMap.Width && 
+                    y >= 0 && y < _gameState.CurrentMap.Height)
+                {
+                    // Convert damage to string and calculate width for centering
+                    string damageText = damageNumber.Value.ToString();
+                    int textWidth = damageText.Length;
+                    int startX = x - (textWidth / 2);
+                    
+                    // Draw with red color for visible damage
+                    Driver.SetAttribute(new Terminal.Gui.Attribute(Color.BrightRed, Color.Black));
+                    
+                    // Draw each character
+                    for (int i = 0; i < damageText.Length; i++)
+                    {
+                        int drawX = startX + i;
+                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width)
+                        {
+                            AddRune(drawX, y, (Rune)damageText[i]);
+                        }
+                    }
+                }
             }
         }
         
@@ -317,6 +365,17 @@ namespace AsciiAscendant.UI
         {
             _selectedEnemy = enemy;
             SetNeedsDisplay();
+        }
+        
+        // Check if a skill is in range of the selected enemy
+        public bool IsSkillInRange(Skill skill)
+        {
+            if (_selectedEnemy == null || !_selectedEnemy.IsAlive)
+            {
+                return false;
+            }
+            
+            return skill.IsInRange(_gameState.Player.Position, _selectedEnemy.Position);
         }
         
         private Terminal.Gui.Attribute GetTileColor(Tile tile)

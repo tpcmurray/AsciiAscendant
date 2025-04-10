@@ -21,6 +21,15 @@ namespace AsciiAscendant.Core.Entities
         private DateTime _moveAnimationStartTime;
         private const int MovementAnimationDurationMs = 100;
         
+        // Hitbox variables
+        public int HitboxWidth => CurrentAscii.Count > 0 ? CurrentAscii[0].Length : 1;
+        public int HitboxHeight => CurrentAscii.Count > 0 ? CurrentAscii.Count : 1;
+        
+        // Flash when hit
+        private DateTime _hitFlashTime = DateTime.MinValue;
+        private const int HitFlashDurationMs = 200;
+        public bool IsFlashing => (DateTime.Now - _hitFlashTime).TotalMilliseconds < HitFlashDurationMs;
+        
         protected Entity(string name, char symbol)
         {
             Name = name;
@@ -30,9 +39,46 @@ namespace AsciiAscendant.Core.Entities
             IsMoving = false;
         }
         
+        // Calculate hitbox corners
+        public (int left, int top, int right, int bottom) GetHitbox()
+        {
+            int left = Position.X - (HitboxWidth / 2);
+            int top = Position.Y - (HitboxHeight / 2);
+            int right = left + HitboxWidth - 1;
+            int bottom = top + HitboxHeight - 1;
+            
+            return (left, top, right, bottom);
+        }
+        
+        // Check collision with another entity
+        public bool CollidesWith(Entity other)
+        {
+            var (myLeft, myTop, myRight, myBottom) = GetHitbox();
+            var (otherLeft, otherTop, otherRight, otherBottom) = other.GetHitbox();
+            
+            return !(otherLeft > myRight || 
+                    otherRight < myLeft || 
+                    otherTop > myBottom ||
+                    otherBottom < myTop);
+        }
+        
+        // Modified to check for entity collisions (no actual entity collision checking yet)
         public virtual bool CanMoveTo(Map map, int x, int y)
         {
-            return map.IsPassable(x, y);
+            // Create a temporary position to check collision
+            Point originalPos = Position;
+            Position = new Point(x, y);
+            
+            // First check if the tile is passable
+            bool passable = map.IsPassable(x, y);
+            
+            // We can't access GameState from here, so we'll just check map tiles for now
+            // Entity collision will be checked by the calling code in GameState
+            
+            // Restore original position
+            Position = originalPos;
+            
+            return passable;
         }
         
         public virtual void Update()
@@ -85,11 +131,22 @@ namespace AsciiAscendant.Core.Entities
             return (Position.X, Position.Y, 1, 1);
         }
         
-        // Get the entity's color for rendering
+        // Get the entity's color for rendering (now considers flashing)
         public virtual Terminal.Gui.Attribute GetEntityColor()
         {
+            // Return red background if flashing from hit
+            if (IsFlashing)
+            {
+                return new Terminal.Gui.Attribute(Color.White, Color.Red);
+            }
+            
             // Default entity color
             return new Terminal.Gui.Attribute(Color.White, Color.Black);
+        }
+        
+        public void Flash()
+        {
+            _hitFlashTime = DateTime.Now;
         }
     }
 }

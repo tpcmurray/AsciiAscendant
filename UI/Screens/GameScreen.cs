@@ -47,13 +47,7 @@ namespace AsciiAscendant.UI
             _closeButton.Clicked += () => Application.RequestStop();
             Add(_closeButton);
             
-            // Create the skill bar (positioned at the bottom)
-            _skillBar = new SkillBar(_gameState);
-            
-            // Create the status bar
-            _statusBar = new StatusBar(_gameState);
-            
-            // Create and add the map view
+            // Create the map view first (needed by SkillBar for range calculations)
             _mapView = new MapView(_gameState)
             {
                 X = 0,
@@ -61,9 +55,15 @@ namespace AsciiAscendant.UI
                 Width = Dim.Fill(),
                 Height = Dim.Fill() - 1 // Leave room for close button
             };
-            Add(_mapView);
+            
+            // Create the skill bar with reference to MapView (positioned at the bottom)
+            _skillBar = new SkillBar(_gameState, _mapView);
+            
+            // Create the status bar
+            _statusBar = new StatusBar(_gameState);
             
             // Add the UI components
+            Add(_mapView);
             Add(_skillBar);
             Add(_statusBar);
             
@@ -184,12 +184,7 @@ namespace AsciiAscendant.UI
                 return;
             }
             
-            // Handle item pickup with Space key
-            if (e.KeyEvent.Key == Key.Space)
-            {
-                PickupItems();
-                return;
-            }
+            // Space key item pickup has been removed since items are now picked up automatically
         }
 
         private void UsePlayerSkill(int skillIndex)
@@ -202,13 +197,20 @@ namespace AsciiAscendant.UI
             {
                 var skill = _gameState.Player.Skills[skillIndex];
                 
+                // Check if the target is in range for this skill
+                bool inRange = _mapView.IsSkillInRange(skill);
+                
+                if (!inRange) 
+                {
+                    // Target is out of range
+                    return;
+                }
+                
                 // Check if skill can be used (not on cooldown)
                 if (skill.CanUse())
                 {
                     // Set the skill on cooldown
                     skill.Use();
-                    
-                    // Console.WriteLine($"Used {skill.Name} on {target.Name}");
                     
                     // Check skill name to determine what type of animation to create
                     if (skill.Name == "Fireball")
@@ -221,17 +223,14 @@ namespace AsciiAscendant.UI
                     }
                     else
                     {
-                        // For other skills, apply damage directly
+                        // For melee skills like Slash, apply damage directly with a flash effect
                         target.TakeDamage(skill.Damage);
+                        target.Flash(); // Ensure the enemy flashes red from the hit
                         
                         // Check if enemy was killed
                         if (!target.IsAlive)
                         {
-                            target.Die(_gameState);
-                            // Console.WriteLine($"{target.Name} was defeated! Gained {target.ExperienceValue} experience.");
-                            
-                            // Clear the selected enemy since it's now dead
-                            _mapView.SelectEnemy(null);
+                            HandleEnemyDeath(target);
                         }
                     }
                     
@@ -241,15 +240,22 @@ namespace AsciiAscendant.UI
                     _skillBar.SetNeedsDisplay();
                     Application.Refresh();
                 }
-                else
-                {
-                    // Console.WriteLine($"{skill.Name} is on cooldown. {skill.CurrentCooldown} turns remaining.");
-                }
             }
-            else if (target == null)
-            {
-                // Console.WriteLine("No target selected. Click on an enemy to select it.");
-            }
+        }
+        
+        // Helper method to handle enemy death
+        private void HandleEnemyDeath(Enemy target)
+        {
+            // Handle loot and XP
+            target.Die(_gameState);
+            
+            // Clear the selected enemy since it's now dead
+            _mapView.SelectEnemy(null);
+            
+            // Update UI
+            _statusBar.SetNeedsDisplay();
+            _mapView.SetNeedsDisplay();
+            _skillBar.SetNeedsDisplay();
         }
 
         private void OpenInventory()

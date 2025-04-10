@@ -42,7 +42,8 @@ namespace AsciiAscendant.Core
             // Add a few basic enemies at random positions
             Random rand = new Random();
             
-            for (int i = 0; i < 5; i++)
+            // Spawn goblins first
+            for (int i = 0; i < 4; i++)
             {
                 // Find a valid spawn position (not on a wall or the player)
                 int x, y;
@@ -54,7 +55,25 @@ namespace AsciiAscendant.Core
                          (Math.Abs(x - Player.Position.X) < 10 && Math.Abs(y - Player.Position.Y) < 10));
                 
                 // Create and add the enemy
-                var enemy = new BasicEnemy($"Goblin {i+1}", 20, 5, 25);
+                var enemy = new Goblin();
+                enemy.MoveTo(CurrentMap, x, y);
+                Enemies.Add(enemy);
+            }
+            
+            // Spawn skeleton archers
+            for (int i = 0; i < 2; i++)
+            {
+                // Find a valid spawn position (not on a wall or the player)
+                int x, y;
+                do
+                {
+                    x = rand.Next(5, CurrentMap.Width - 5);
+                    y = rand.Next(5, CurrentMap.Height - 5);
+                } while (!CurrentMap.IsPassable(x, y) || 
+                         (Math.Abs(x - Player.Position.X) < 15 && Math.Abs(y - Player.Position.Y) < 15));
+                
+                // Create and add the enemy
+                var enemy = new SkeletonArcher();
                 enemy.MoveTo(CurrentMap, x, y);
                 Enemies.Add(enemy);
             }
@@ -198,16 +217,67 @@ namespace AsciiAscendant.Core
             ActiveAnimations.Add(arrow);
         }
         
-        // Combine regeneration of stamina and tick-based updates
+        // New method for enemies to fire arrow projectiles at the player
+        public void CreateEnemyArrowAnimation(Point source, int damage)
+        {
+            // Create a new arrow animation targeting the player
+            var arrow = new ArrowAnimation(source, Player.Position, null, damage);
+            
+            // Add to active animations
+            ActiveAnimations.Add(arrow);
+            
+            // Note: Damage is applied in the SkeletonArcher's RangedAttack method
+        }
+        
+        // Handles animation updates and automatic item pickup
         public void UpdateGameTick()
         {
-            // Regenerate player stamina
-            Player.RegenerateStamina(1); // Regenerate 1 stamina per tick
+            // Health and stamina regeneration have been moved to GameEngine class
+            // to occur at a rate of once per second instead of every tick
+            
+            // Check for automatic item pickup (new functionality)
+            CheckForAutomaticItemPickup();
             
             // Update animations
             UpdateAnimations();
             
             // Other tick-based updates could go here
+        }
+        
+        // New method to automatically pick up items that collide with the player
+        private void CheckForAutomaticItemPickup()
+        {
+            if (DroppedItems.Count == 0)
+                return;
+                
+            // Create a temporary collection to avoid modifying collection during iteration
+            List<Item> itemsToPickup = new List<Item>();
+            
+            // Check each item for collision with the player
+            foreach (var item in DroppedItems)
+            {
+                if (item.CollidesWith(Player))
+                {
+                    itemsToPickup.Add(item);
+                }
+            }
+            
+            // Process all colliding items
+            foreach (var item in itemsToPickup)
+            {
+                // Try to add item to player's inventory
+                if (Player.AddItemToInventory(item))
+                {
+                    // Remove item from the world
+                    DroppedItems.Remove(item);
+                    // Console.WriteLine($"Auto-picked up: {item.Name}");
+                }
+                else
+                {
+                    // Console.WriteLine("Inventory is full!");
+                    break; // Stop trying to pick up more items if inventory is full
+                }
+            }
         }
     }
 }

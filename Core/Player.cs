@@ -63,10 +63,10 @@ namespace AsciiAscendant.Core
                 @"/ \"
             };
             
-            // Add some basic skills
-            Skills.Add(new Skill("Slash", 5, 1));
-            Skills.Add(new Skill("Fireball", 15, 3));
-            Skills.Add(new Skill("Arrow Shot", 8, 2));
+            // Add skills with appropriate ranges
+            Skills.Add(new Skill("Slash", 5, 1.0f, SkillType.Melee, 1, 4)); // Melee
+            Skills.Add(new Skill("Fireball", 15, 6.0f, SkillType.Ranged, 3, 70)); // Ranged
+            Skills.Add(new Skill("Arrow Shot", 8, 2.5f, SkillType.Ranged, 2, 50)); // Ranged
         }
         
         // Inventory Methods
@@ -272,9 +272,19 @@ namespace AsciiAscendant.Core
             return true;
         }
         
-        public void RegenerateStamina(int amount)
+        public void RegenerateStamina()
         {
-            Stamina = Math.Min(Stamina + amount, MaxStamina);
+            Stamina = Math.Min(Stamina + 1, MaxStamina);
+        }
+        
+        // Health regeneration method
+        public void RegenerateHealth()
+        {
+            // Only regenerate if player is alive
+            if (Health > 0)
+            {
+                Health = Math.Min(Health + 1, MaxHealth);
+            }
         }
         
         // Existing methods
