@@ -8,7 +8,7 @@ namespace AsciiAscendant.UI
     {
         private readonly GameState _gameState;
         private readonly MapView _mapView;
-        private const int BarHeight = 5; // Total height of skill bar
+        private const int BarHeight = 6; // Total height of skill bar (increased to accommodate cooldown bar)
         
         public SkillBar(GameState gameState, MapView mapView)
         {
@@ -107,9 +107,40 @@ namespace AsciiAscendant.UI
                             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.Green, Color.Black));
                             DrawText(x + 1, row, readyText, skillBlockWidth - 2);
                         }
+                        
+                        // Draw cooldown progress bar directly below skill status text
+                        if (skill.CooldownInSeconds > 0)
+                        {
+                            int barRow = row + 1;
+                            int barWidth = skillBlockWidth - 2;
+                            
+                            // Calculate fill percentage (inverted: 0% means full cooldown, 100% means ready)
+                            float percentage = 1f;
+                            if (skill.CurrentCooldownInSeconds > 0)
+                            {
+                                percentage = 1f - (skill.CurrentCooldownInSeconds / skill.CooldownInSeconds);
+                            }
+                            
+                            int filledWidth = (int)Math.Ceiling(barWidth * percentage);
+                            
+                            // Draw progress bar background first
+                            Driver.SetAttribute(new Terminal.Gui.Attribute(Color.Gray, Color.Black));
+                            for (int j = 0; j < barWidth; j++)
+                            {
+                                AddRune(x + 1 + j, barRow, (Rune)'░');
+                            }
+                            
+                            // Draw filled portion
+                            Color fillColor = percentage < 1f ? Color.BrightYellow : Color.Green;
+                            Driver.SetAttribute(new Terminal.Gui.Attribute(fillColor, Color.Black));
+                            for (int j = 0; j < filledWidth && j < barWidth; j++)
+                            {
+                                AddRune(x + 1 + j, barRow, (Rune)'█');
+                            }
+                        }
                     }
-                    // Row 2 (index 2): Skill name
-                    else if (row == 2)
+                    // Row 2 (index 2): Skill name - shift one down to accommodate cooldown bar
+                    else if (row == 3)
                     {
                         // Gray out the name if skill isn't available
                         var color = (isTargetSelected && isInRange && isSkillAvailable) ? 
@@ -117,8 +148,8 @@ namespace AsciiAscendant.UI
                         Driver.SetAttribute(new Terminal.Gui.Attribute(color, Color.Black));
                         DrawText(x + 1, row, skill.Name, skillBlockWidth - 2);
                     }
-                    // Row 3 (index 3): Skill damage and type/range
-                    else if (row == 3)
+                    // Row 3 (index 3): Skill damage and type/range - shift one down
+                    else if (row == 4)
                     {
                         // Gray out the damage if skill isn't available
                         var color = (isTargetSelected && isInRange && isSkillAvailable) ? 

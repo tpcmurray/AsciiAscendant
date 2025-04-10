@@ -26,6 +26,14 @@ namespace AsciiAscendant.UI
         // Flag to prevent multiple inventory screens
         private bool _isInventoryOpen = false;
         
+        // Constants for visual effects
+        private const int ShakeDuration = 7;
+        private const int ShakeIntensity = 1;
+        private const int HitParticleCount = 8;
+        private const int HitParticleDuration = 12;
+        private const int DeathParticleCount = 20;
+        private const int DeathParticleDuration = 25;
+        
         public GameScreen(GameState gameState) : base("ASCII Ascendant")
         {
             _gameState = gameState;
@@ -82,6 +90,52 @@ namespace AsciiAscendant.UI
                 LayoutSubviews();
                 Application.Refresh();
             };
+            
+            // Subscribe to creature events for visual effects
+            Creature.OnPlayerTakeDamage += OnPlayerDamaged;
+            Creature.OnEnemyTakeDamage += OnEnemyDamaged;
+            Creature.OnCreatureDeath += OnCreatureDied;
+        }
+        
+        // Event handlers for visual effects
+        private void OnPlayerDamaged(object? sender, int damageAmount)
+        {
+            // Create screen shake effect when player takes damage
+            _mapView.StartShake(ShakeDuration, ShakeIntensity);
+            SetNeedsDisplay();
+        }
+        
+        private void OnEnemyDamaged(object? sender, Creature enemy)
+        {
+            // Create hit particles when enemy is damaged
+            var enemyPos = new AsciiAscendant.Core.Point(enemy.Position.X, enemy.Position.Y);
+            _mapView.CreateParticleEffect(enemyPos, HitParticleCount, HitParticleDuration);
+            SetNeedsDisplay();
+        }
+        
+        private void OnCreatureDied(object? sender, Creature creature)
+        {
+            if (creature is Enemy enemy)
+            {
+                // Create death effect particles
+                var enemyPos = new AsciiAscendant.Core.Point(enemy.Position.X, enemy.Position.Y);
+                _mapView.CreateParticleEffect(enemyPos, DeathParticleCount, DeathParticleDuration, isDeathEffect: true);
+                SetNeedsDisplay();
+            }
+        }
+        
+        // Clean up by unsubscribing from events
+        protected override void Dispose(bool disposing)
+        {
+            // Unsubscribe from events to prevent memory leaks
+            if (disposing)
+            {
+                Creature.OnPlayerTakeDamage -= OnPlayerDamaged;
+                Creature.OnEnemyTakeDamage -= OnEnemyDamaged;
+                Creature.OnCreatureDeath -= OnCreatureDied;
+            }
+            
+            base.Dispose(disposing);
         }
         
         // Override the LayoutSubviews method properly
@@ -329,6 +383,13 @@ namespace AsciiAscendant.UI
             
             // Force an immediate refresh of the UI
             Application.Refresh();
+        }
+
+        // Add method to update map effects (screen shake, particles)
+        public void UpdateMapEffects()
+        {
+            // Call the MapView's update method to handle screen shake and particles
+            _mapView.OnUpdateFrame();
         }
     }
 }

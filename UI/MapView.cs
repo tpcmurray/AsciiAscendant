@@ -4,6 +4,7 @@ using AsciiAscendant.Core;
 using AsciiAscendant.Core.Entities;
 using AsciiAscendant.Core.Animations;
 using AsciiAscendant.Core.Loot;
+using System.Collections.Generic;
 
 namespace AsciiAscendant.UI
 {
@@ -12,6 +13,15 @@ namespace AsciiAscendant.UI
         private readonly GameState _gameState;
         private Enemy? _selectedEnemy = null;
         
+        // Screen shake properties
+        private bool _isShaking = false;
+        private int _shakeDuration = 0;
+        private int _shakeIntensity = 0;
+        private Random _shakeRandom = new Random();
+        
+        // ASCII particle effect properties
+        private List<AsciiParticle> _particles = new List<AsciiParticle>();
+        
         public MapView(GameState gameState)
         {
             _gameState = gameState;
@@ -19,6 +29,81 @@ namespace AsciiAscendant.UI
             // Enable mouse tracking for enemy selection
             WantMousePositionReports = true;
             CanFocus = true;
+        }
+        
+        // Trigger screen shake with specified duration and intensity
+        public void StartShake(int duration, int intensity)
+        {
+            _isShaking = true;
+            _shakeDuration = duration;
+            _shakeIntensity = intensity;
+        }
+        
+        // Create a particle effect at the specified position
+        public void CreateParticleEffect(AsciiAscendant.Core.Point position, int particleCount, int duration, bool isDeathEffect = false)
+        {
+            char[] particleChars = isDeathEffect 
+                ? new char[] { '*', '#', '+', '\\', '/', '|', '-' }  // Death effect chars
+                : new char[] { '*', '!', '.', ',', '\'', '`' };      // Hit effect chars
+                
+            for (int i = 0; i < particleCount; i++)
+            {
+                int velX = _shakeRandom.Next(-2, 3);
+                int velY = _shakeRandom.Next(-2, 3);
+                char particleChar = particleChars[_shakeRandom.Next(particleChars.Length)];
+                
+                Color color = isDeathEffect 
+                    ? (Color)_shakeRandom.Next((int)Color.Red, (int)Color.BrightYellow + 1)
+                    : Color.White;
+                
+                _particles.Add(new AsciiParticle(
+                    position.X, position.Y,
+                    velX, velY,
+                    particleChar,
+                    color,
+                    duration
+                ));
+            }
+        }
+        
+        public void OnUpdateFrame()
+        {
+            
+            // Update particles
+            for (int i = _particles.Count - 1; i >= 0; i--)
+            {
+                _particles[i].Update();
+                if (_particles[i].IsExpired)
+                {
+                    _particles.RemoveAt(i);
+                }
+            }
+            
+            // Update screen shake
+            if (_isShaking && _shakeDuration > 0)
+            {
+                _shakeDuration--;
+                if (_shakeDuration <= 0)
+                {
+                    _isShaking = false;
+                }
+                
+                // Need to refresh display each shake frame
+                SetNeedsDisplay();
+            }
+        }
+        
+        // Get screen shake offset based on current shake state
+        private AsciiAscendant.Core.Point GetShakeOffset()
+        {
+            if (!_isShaking || _shakeDuration <= 0)
+                return new AsciiAscendant.Core.Point(0, 0);
+                
+            // Calculate random offset based on intensity
+            int xOffset = _shakeRandom.Next(-_shakeIntensity, _shakeIntensity + 1);
+            int yOffset = _shakeRandom.Next(-_shakeIntensity, _shakeIntensity + 1);
+            
+            return new AsciiAscendant.Core.Point(xOffset, yOffset);
         }
         
         public override bool MouseEvent(MouseEvent me)
@@ -62,6 +147,9 @@ namespace AsciiAscendant.UI
         {
             base.Redraw(bounds);
             
+            // Get screen shake offset
+            var shakeOffset = GetShakeOffset();
+            
             // Draw the map
             var map = _gameState.CurrentMap;
             for (int x = 0; x < map.Width; x++)
@@ -69,37 +157,49 @@ namespace AsciiAscendant.UI
                 for (int y = 0; y < map.Height; y++)
                 {
                     // Only draw what's visible in the viewport
-                    if (x >= bounds.X && x < bounds.X + bounds.Width &&
-                        y >= bounds.Y && y < bounds.Y + bounds.Height)
+                    // Apply shake offset to rendering positions
+                    int drawX = x + shakeOffset.X;
+                    int drawY = y + shakeOffset.Y;
+                    
+                    if (drawX >= bounds.X && drawX < bounds.X + bounds.Width &&
+                        drawY >= bounds.Y && drawY < bounds.Y + bounds.Height)
                     {
                         var tile = map.Tiles[x, y];
                         var symbol = tile.Symbol;
                         
                         Driver.SetAttribute(GetTileColor(tile));
-                        AddRune(x, y, (Rune)symbol);
+                        AddRune(drawX, drawY, (Rune)symbol);
                     }
                 }
             }
             
-            // Draw dropped items
+            // Draw dropped items with shake offset
             foreach (var item in _gameState.DroppedItems)
             {
                 // Get item render dimensions
                 var (itemX, itemY, width, height) = item.GetRenderDimensions();
                 
+                // Apply shake offset
+                itemX += shakeOffset.X;
+                itemY += shakeOffset.Y;
+                
                 // Only draw item if within viewport
                 if (itemX + width > bounds.X && itemX < bounds.X + bounds.Width &&
                     itemY + height > bounds.Y && itemY < bounds.Y + bounds.Height)
                 {
-                    DrawItem(item);
+                    DrawItem(item, shakeOffset);
                 }
             }
             
-            // Draw all enemies
+            // Draw all enemies with shake offset
             foreach (var enemy in _gameState.Enemies)
             {
                 // Get enemy render dimensions
                 var (enemyX, enemyY, width, height) = enemy.GetRenderDimensions();
+                
+                // Apply shake offset
+                enemyX += shakeOffset.X;
+                enemyY += shakeOffset.Y;
                 
                 // Only draw enemy if within viewport
                 if (enemyX + width > bounds.X && enemyX < bounds.X + bounds.Width &&
@@ -108,46 +208,61 @@ namespace AsciiAscendant.UI
                     // Draw selection indicators if this is the selected enemy
                     if (_selectedEnemy == enemy)
                     {
-                        DrawSelectionIndicator(enemy);
+                        DrawSelectionIndicator(enemy, shakeOffset);
                     }
                     
                     // Draw the enemy
-                    DrawCreature(enemy, true);
+                    DrawCreature(enemy, true, shakeOffset);
                 }
             }
             
-            // Draw the player
-            DrawCreature(_gameState.Player, false);
+            // Draw the player with shake offset
+            DrawCreature(_gameState.Player, false, shakeOffset);
             
-            // Draw damage numbers for creatures
+            // Draw damage numbers for creatures with shake offset
             foreach (var enemy in _gameState.Enemies)
             {
                 if (enemy.ActiveDamageNumbers.Count > 0)
                 {
-                    DrawDamageNumbers(enemy);
+                    DrawDamageNumbers(enemy, shakeOffset);
                 }
             }
             
-            // Draw player damage numbers
+            // Draw player damage numbers with shake offset
             if (_gameState.Player.ActiveDamageNumbers.Count > 0)
             {
-                DrawDamageNumbers(_gameState.Player);
+                DrawDamageNumbers(_gameState.Player, shakeOffset);
             }
             
-            // Draw all active animations on top
+            // Draw particles with shake offset
+            foreach (var particle in _particles)
+            {
+                int drawX = particle.X + shakeOffset.X;
+                int drawY = particle.Y + shakeOffset.Y;
+                
+                // Make sure we're within map bounds
+                if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
+                    drawY >= 0 && drawY < _gameState.CurrentMap.Height)
+                {
+                    Driver.SetAttribute(new Terminal.Gui.Attribute(particle.Color, Color.Black));
+                    AddRune(drawX, drawY, (Rune)particle.Symbol);
+                }
+            }
+            
+            // Draw all active animations on top with shake offset
             foreach (var animation in _gameState.ActiveAnimations)
             {
-                animation.Draw(this);
+                animation.Draw(this, shakeOffset);
             }
         }
         
-        private void DrawDamageNumbers(Creature creature)
+        private void DrawDamageNumbers(Creature creature, AsciiAscendant.Core.Point shakeOffset)
         {
             foreach (var damageNumber in creature.ActiveDamageNumbers)
             {
                 // Calculate position with rising effect
-                int x = damageNumber.Position.X;
-                int y = (int)(damageNumber.Position.Y - damageNumber.YOffset);
+                int x = damageNumber.Position.X + shakeOffset.X;
+                int y = (int)(damageNumber.Position.Y - damageNumber.YOffset) + shakeOffset.Y;
                 
                 // Make sure we're within map bounds
                 if (x >= 0 && x < _gameState.CurrentMap.Width && 
@@ -174,10 +289,14 @@ namespace AsciiAscendant.UI
             }
         }
         
-        private void DrawCreature(Creature creature, bool isEnemy)
+        private void DrawCreature(Creature creature, bool isEnemy, AsciiAscendant.Core.Point shakeOffset)
         {
             // Get creature render dimensions
             var (x, y, width, height) = creature.GetRenderDimensions();
+            
+            // Apply shake offset
+            x += shakeOffset.X;
+            y += shakeOffset.Y;
             
             // Use the entity's own color method
             Driver.SetAttribute(creature.GetEntityColor());
@@ -205,7 +324,7 @@ namespace AsciiAscendant.UI
                 
                 // Draw health bar for creatures - moved up by one additional row (y-2 instead of y-1)
                 float healthPercentage = creature.GetHealthPercentage();
-                DrawHealthBar(creature.Position.X, y - 2, healthPercentage, creature.Name);
+                DrawHealthBar(creature.Position.X + shakeOffset.X, y - 2, healthPercentage, creature.Name);
             }
             else
             {
@@ -221,10 +340,14 @@ namespace AsciiAscendant.UI
             }
         }
         
-        private void DrawItem(Item item)
+        private void DrawItem(Item item, AsciiAscendant.Core.Point shakeOffset)
         {
             // Get item render dimensions
             var (x, y, width, height) = item.GetRenderDimensions();
+            
+            // Apply shake offset
+            x += shakeOffset.X;
+            y += shakeOffset.Y;
             
             // Use the item's own color method
             Driver.SetAttribute(item.GetEntityColor());
@@ -260,9 +383,13 @@ namespace AsciiAscendant.UI
             }
         }
         
-        private void DrawSelectionIndicator(Entity entity)
+        private void DrawSelectionIndicator(Entity entity, AsciiAscendant.Core.Point shakeOffset)
         {
             var (x, y, width, height) = entity.GetRenderDimensions();
+            
+            // Apply shake offset
+            x += shakeOffset.X;
+            y += shakeOffset.Y;
             
             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
             
@@ -388,6 +515,37 @@ namespace AsciiAscendant.UI
                 TileType.Water => new Terminal.Gui.Attribute(Color.Blue, Color.Black),
                 _ => new Terminal.Gui.Attribute(Color.White, Color.Black)
             };
+        }
+    }
+    
+    // ASCII particle class for visual effects
+    public class AsciiParticle
+    {
+        public int X { get; private set; }
+        public int Y { get; private set; }
+        private readonly int _velX;
+        private readonly int _velY;
+        public char Symbol { get; }
+        public Color Color { get; }
+        private int _lifetime;
+        public bool IsExpired => _lifetime <= 0;
+        
+        public AsciiParticle(int x, int y, int velX, int velY, char symbol, Color color, int lifetime)
+        {
+            X = x;
+            Y = y;
+            _velX = velX;
+            _velY = velY;
+            Symbol = symbol;
+            Color = color;
+            _lifetime = lifetime;
+        }
+        
+        public void Update()
+        {
+            X += _velX;
+            Y += _velY;
+            _lifetime--;
         }
     }
 }

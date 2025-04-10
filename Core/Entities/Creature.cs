@@ -43,6 +43,17 @@ namespace AsciiAscendant.Core.Entities
         // List of active damage numbers
         public List<DamageNumber> ActiveDamageNumbers { get; protected set; } = new List<DamageNumber>();
         
+        // Enhanced visual effect parameters
+        protected bool _isColorFlashing = false;
+        protected int _flashDuration = 0;
+        protected Terminal.Gui.Attribute _originalColor;
+        protected Terminal.Gui.Attribute _flashColor = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
+        
+        // Events for visual effects - made nullable to resolve compilation errors
+        public static event EventHandler<Creature>? OnCreatureDeath;
+        public static event EventHandler<Creature>? OnEnemyTakeDamage; 
+        public static event EventHandler<int>? OnPlayerTakeDamage;
+        
         protected Creature(string name, char symbol, int maxHealth, int damage) 
             : base(name, symbol)
         {
@@ -64,6 +75,16 @@ namespace AsciiAscendant.Core.Entities
                 if (ActiveDamageNumbers[i].IsExpired())
                 {
                     ActiveDamageNumbers.RemoveAt(i);
+                }
+            }
+            
+            // Update color flash effect
+            if (_isColorFlashing && _flashDuration > 0)
+            {
+                _flashDuration--;
+                if (_flashDuration <= 0)
+                {
+                    _isColorFlashing = false;
                 }
             }
         }
@@ -93,13 +114,50 @@ namespace AsciiAscendant.Core.Entities
                 Health = 0;
             }
             
+            // Add damage number
             ActiveDamageNumbers.Add(new DamageNumber(amount, new Point(Position.X, Position.Y - 4)));
             
-            // Flash the creature red
-            Flash();
+            // Enhanced damage visual feedback
+            Flash(15); // Longer flash for more visibility
+            
+            // Notify UI for possible screen shake (will be handled by GameScreen)
+            if (this is Player)
+            {
+                // Signal player damage for screen shake
+                OnPlayerTakeDamage?.Invoke(this, amount);
+            }
+            else
+            {
+                // Signal enemy damage for hit particles
+                OnEnemyTakeDamage?.Invoke(this, this);
+            }
+            
+            // Check if creature died from this damage
+            if (Health <= 0)
+            {
+                // Trigger death effect
+                OnCreatureDeath?.Invoke(this, this);
+            }
         }
         
         public bool IsAlive => Health > 0;
+        
+        // Enhanced Flash method with duration parameter
+        public void Flash(int duration = 5)
+        {
+            _isColorFlashing = true;
+            _flashDuration = duration;
+        }
+        
+        // Override the GetEntityColor to support flashing
+        public override Terminal.Gui.Attribute GetEntityColor()
+        {
+            if (_isColorFlashing)
+            {
+                return _flashColor;
+            }
+            return base.GetEntityColor();
+        }
         
         // Get health percentage for rendering
         public float GetHealthPercentage()

@@ -110,13 +110,25 @@ namespace AsciiAscendant.Core.Animations
             }
         }
         
+        // Original draw method - call new method with zero offset
         public override void Draw(View view)
+        {
+            // Use the default implementation from the base class
+            base.Draw(view);
+        }
+        
+        // New draw method with shake offset
+        public override void Draw(View view, Point shakeOffset)
         {
             // Only draw if position is valid
             if (CurrentPosition.X >= 0 && CurrentPosition.Y >= 0)
             {
+                // Apply shake offset
+                int drawX = CurrentPosition.X + shakeOffset.X;
+                int drawY = CurrentPosition.Y + shakeOffset.Y;
+                
                 Application.Driver.SetAttribute(Color);
-                view.AddRune(CurrentPosition.X, CurrentPosition.Y, (Rune)Symbol);
+                view.AddRune(drawX, drawY, (Rune)Symbol);
             }
         }
     }

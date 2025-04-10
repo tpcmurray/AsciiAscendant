@@ -91,6 +91,9 @@ namespace AsciiAscendant.Engine
             // Use the new UpdateGameTick for stamina regeneration and animations
             _gameState.UpdateGameTick();
             
+            // Update visual effects in the map view
+            _gameScreen.UpdateMapEffects();
+            
             // Update enemies less frequently (once per second)
             _enemyUpdateCounter++;
             if (_enemyUpdateCounter >= EnemyUpdateFrequency)
