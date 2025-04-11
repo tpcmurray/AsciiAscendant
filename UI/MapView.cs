@@ -351,10 +351,28 @@ namespace AsciiAscendant.UI
             // Draw all active animations
             foreach (var animation in _gameState.ActiveAnimations)
             {
-                // Convert to screen coordinates and draw with viewport adjustment
-                var (animScreenX, animScreenY) = WorldToScreen(animation.Position.X, animation.Position.Y);
-                
-                animation.DrawAtViewportCoordinates(this, animScreenX + shakeOffset.X, animScreenY + shakeOffset.Y);
+                if (animation is ProjectileAnimation projectile)
+                {
+                    // Convert world coordinates to screen coordinates
+                    var (screenX, screenY) = WorldToScreen(projectile.CurrentPosition.X, projectile.CurrentPosition.Y);
+                    
+                    // Apply shake offset
+                    int drawX = screenX + shakeOffset.X;
+                    int drawY = screenY + shakeOffset.Y;
+                    
+                    // Draw the projectile directly
+                    if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
+                    {
+                        Driver.SetAttribute(projectile.Color);
+                        AddRune(drawX, drawY, (Rune)projectile.Symbol);
+                    }
+                }
+                else
+                {
+                    // For other animation types
+                    var (animScreenX, animScreenY) = WorldToScreen(animation.Position.X, animation.Position.Y);
+                    animation.DrawAtViewportCoordinates(this, animScreenX + shakeOffset.X, animScreenY + shakeOffset.Y);
+                }
             }
         }
         
