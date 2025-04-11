@@ -8,75 +8,179 @@ namespace AsciiAscendant.Core
 {
     public class GameState
     {
-        public Player Player { get; private set; }
-        public Map CurrentMap { get; private set; }
-        public List<Enemy> Enemies { get; private set; }
-        public List<Animation> ActiveAnimations { get; private set; }
-        public List<Item> DroppedItems { get; private set; }
+        public Player Player { get; private set; } = null!;
+        public Map CurrentMap { get; private set; } = null!;
+        public List<Enemy> Enemies { get; private set; } = new List<Enemy>();
+        public List<Animation> ActiveAnimations { get; private set; } = new List<Animation>();
+        public List<Item> DroppedItems { get; private set; } = new List<Item>();
         
-        public GameState()
+        // Random generator with an optional seed for consistent map generation
+        private readonly Random _random;
+        
+        public GameState(int? mapSeed = null)
         {
-            // Initialize a default map for testing
-            CurrentMap = new Map(90, 50);
+            // Initialize random number generator with optional seed
+            _random = mapSeed.HasValue ? new Random(mapSeed.Value) : new Random();
             
-            // Initialize player at the center of the map
+            // Initialize with large random map
+            InitializeLargeWorld();
+            
+            // Initialize player at a suitable starting location
             Player = new Player();
-            // Use MoveTo instead of directly setting Position
-            Player.MoveTo(CurrentMap, CurrentMap.Width / 2, CurrentMap.Height / 2);
+            PositionPlayerAtSuitableLocation();
+        }
+        
+        private void InitializeLargeWorld()
+        {
+            // Create a large 1000x500 map - this will generate terrain features
+            // like water, forests, ruins, rocks, etc.
+            CurrentMap = Map.GenerateRandomMap(1000, 500, _random.Next());
             
-            // Initialize enemies list
-            Enemies = new List<Enemy>();
+            // Set initial viewport size
+            CurrentMap.ViewportWidth = 80; 
+            CurrentMap.ViewportHeight = 40;
+        }
+        
+        private void PositionPlayerAtSuitableLocation()
+        {
+            // Find a suitable starting position for the player (grass area, not water/wall)
+            int x, y;
+            int attempts = 0;
+            const int maxAttempts = 1000; // Prevent infinite loop
             
-            // Initialize animations list
-            ActiveAnimations = new List<Animation>();
+            do
+            {
+                // Try random positions in the central area of the map
+                x = CurrentMap.Width / 2 - 100 + _random.Next(200);
+                y = CurrentMap.Height / 2 - 50 + _random.Next(100);
+                attempts++;
+            } while ((!CurrentMap.IsPassable(x, y) || 
+                     IsTileNearWater(x, y, 3)) && 
+                     attempts < maxAttempts);
             
-            // Initialize dropped items list
-            DroppedItems = new List<Item>();
+            // Position the player at the found location or map center as fallback
+            if (attempts >= maxAttempts)
+            {
+                // Fallback to a position that's definitely walkable
+                for (int testX = 0; testX < CurrentMap.Width; testX++)
+                {
+                    for (int testY = 0; testY < CurrentMap.Height; testY++)
+                    {
+                        if (CurrentMap.IsPassable(testX, testY))
+                        {
+                            x = testX;
+                            y = testY;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Use MoveTo to place player at position
+            Player.MoveTo(CurrentMap, x, y);
+            
+            // Center the camera on player
+            CurrentMap.CenterCamera(x, y);
             
             // Add some test enemies
             SpawnInitialEnemies();
         }
         
+        // Check if a tile is near water (for better player starting position)
+        private bool IsTileNearWater(int x, int y, int radius)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    int checkX = x + dx;
+                    int checkY = y + dy;
+                    
+                    // Check bounds
+                    if (checkX >= 0 && checkX < CurrentMap.Width && 
+                        checkY >= 0 && checkY < CurrentMap.Height)
+                    {
+                        if (CurrentMap.Tiles[checkX, checkY].TileType == TileType.Water)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
         private void SpawnInitialEnemies()
         {
-            // Add a few basic enemies at random positions
-            Random rand = new Random();
+            // Add enemies at suitable positions around the player
+            int spawnRadius = 20; // Spawn enemies within this radius of player
+            int minDist = 10;     // Minimum distance from player
             
             // Spawn goblins first
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 6; i++)
             {
-                // Find a valid spawn position (not on a wall or the player)
-                int x, y;
-                do
-                {
-                    x = rand.Next(5, CurrentMap.Width - 5);
-                    y = rand.Next(5, CurrentMap.Height - 5);
-                } while (!CurrentMap.IsPassable(x, y) || 
-                         (Math.Abs(x - Player.Position.X) < 10 && Math.Abs(y - Player.Position.Y) < 10));
-                
-                // Create and add the enemy
-                var enemy = new Goblin();
-                enemy.MoveTo(CurrentMap, x, y);
-                Enemies.Add(enemy);
+                SpawnEnemyNearPlayer<Goblin>(minDist, spawnRadius);
             }
             
             // Spawn skeleton archers
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 4; i++)
             {
-                // Find a valid spawn position (not on a wall or the player)
-                int x, y;
-                do
-                {
-                    x = rand.Next(5, CurrentMap.Width - 5);
-                    y = rand.Next(5, CurrentMap.Height - 5);
-                } while (!CurrentMap.IsPassable(x, y) || 
-                         (Math.Abs(x - Player.Position.X) < 15 && Math.Abs(y - Player.Position.Y) < 15));
-                
-                // Create and add the enemy
-                var enemy = new SkeletonArcher();
-                enemy.MoveTo(CurrentMap, x, y);
-                Enemies.Add(enemy);
+                SpawnEnemyNearPlayer<SkeletonArcher>(minDist, spawnRadius);
             }
+        }
+        
+        // Helper method to spawn enemies near the player
+        private T SpawnEnemyNearPlayer<T>(int minDistance, int maxDistance) where T : Enemy, new()
+        {
+            // Find a valid spawn position (not on a wall or water, and within range)
+            int x, y;
+            int attempts = 0;
+            const int maxAttempts = 100;
+            
+            do
+            {
+                // Get angle and distance
+                double angle = _random.NextDouble() * 2 * Math.PI;
+                double distance = minDistance + _random.NextDouble() * (maxDistance - minDistance);
+                
+                // Calculate position
+                x = (int)(Player.Position.X + Math.Cos(angle) * distance);
+                y = (int)(Player.Position.Y + Math.Sin(angle) * distance);
+                
+                attempts++;
+                
+                // Exit if we've tried too many times
+                if (attempts >= maxAttempts) 
+                {
+                    // Place at a default position as fallback
+                    x = Player.Position.X + maxDistance;
+                    y = Player.Position.Y;
+                    break;
+                }
+                
+            } while (!IsValidEnemySpawnPosition(x, y));
+            
+            // Create and add the enemy
+            var enemy = new T();
+            enemy.MoveTo(CurrentMap, x, y);
+            Enemies.Add(enemy);
+            
+            return enemy;
+        }
+        
+        // Check if position is valid for enemy spawn
+        private bool IsValidEnemySpawnPosition(int x, int y)
+        {
+            // Check bounds and passability
+            if (x < 0 || x >= CurrentMap.Width || y < 0 || y >= CurrentMap.Height || !CurrentMap.IsPassable(x, y))
+            {
+                return false;
+            }
+            
+            // Additional checks can be added here (e.g., not in ruins, not on special terrain)
+            
+            return true;
         }
         
         public void AddEnemy(Enemy enemy)
@@ -221,7 +325,7 @@ namespace AsciiAscendant.Core
         public void CreateEnemyArrowAnimation(Point source, int damage)
         {
             // Create a new arrow animation targeting the player
-            var arrow = new ArrowAnimation(source, Player.Position, null, damage);
+            var arrow = new ArrowAnimation(source, Player.Position, null!, damage);
             
             // Add to active animations
             ActiveAnimations.Add(arrow);
@@ -240,6 +344,9 @@ namespace AsciiAscendant.Core
             
             // Update animations
             UpdateAnimations();
+            
+            // Always ensure camera is centered on player for scrolling map
+            CurrentMap.CenterCamera(Player.Position.X, Player.Position.Y);
             
             // Other tick-based updates could go here
         }

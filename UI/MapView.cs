@@ -68,6 +68,12 @@ namespace AsciiAscendant.UI
         
         public void OnUpdateFrame()
         {
+            // Update map camera to follow player
+            var map = _gameState.CurrentMap;
+            var player = _gameState.Player;
+            
+            // Center camera on player
+            map.CenterCamera(player.Position.X, player.Position.Y);
             
             // Update particles
             for (int i = _particles.Count - 1; i >= 0; i--)
@@ -110,19 +116,21 @@ namespace AsciiAscendant.UI
         {
             if (me.Flags == MouseFlags.Button1Clicked)
             {
-                // Check if the player clicked on an enemy
-                int mouseX = me.X;
-                int mouseY = me.Y;
+                var map = _gameState.CurrentMap;
+                var visibleArea = map.GetVisibleArea();
+                
+                // Calculate actual map coordinates from screen position
+                int mapX = me.X + visibleArea.startX;
+                int mapY = me.Y + visibleArea.startY;
                 
                 _selectedEnemy = null;
                 
                 // Check each enemy to see if the mouse click is within its ASCII representation
                 foreach (var enemy in _gameState.Enemies)
                 {
-                    if (enemy.IsAlive && IsPointInsideEntity(mouseX, mouseY, enemy))
+                    if (enemy.IsAlive && IsPointInsideEntity(mapX, mapY, enemy))
                     {
                         _selectedEnemy = enemy;
-                        // Console.WriteLine($"Selected enemy: {enemy.Name}");
                         break;
                     }
                 }
@@ -143,6 +151,24 @@ namespace AsciiAscendant.UI
                    y >= entityY && y < entityY + height;
         }
         
+        // Convert world coordinates to screen coordinates
+        private (int screenX, int screenY) WorldToScreen(int worldX, int worldY)
+        {
+            var map = _gameState.CurrentMap;
+            var visibleArea = map.GetVisibleArea();
+            
+            return (worldX - visibleArea.startX, worldY - visibleArea.startY);
+        }
+        
+        // Convert screen coordinates to world coordinates
+        private (int worldX, int worldY) ScreenToWorld(int screenX, int screenY)
+        {
+            var map = _gameState.CurrentMap;
+            var visibleArea = map.GetVisibleArea();
+            
+            return (screenX + visibleArea.startX, screenY + visibleArea.startY);
+        }
+        
         public override void Redraw(Rect bounds)
         {
             base.Redraw(bounds);
@@ -150,154 +176,207 @@ namespace AsciiAscendant.UI
             // Get screen shake offset
             var shakeOffset = GetShakeOffset();
             
-            // Draw the map
+            // Get visible map area
             var map = _gameState.CurrentMap;
-            for (int x = 0; x < map.Width; x++)
+            var (startX, startY, endX, endY) = map.GetVisibleArea();
+            
+            // Set viewport dimensions in map
+            map.ViewportWidth = bounds.Width;
+            map.ViewportHeight = bounds.Height;
+            
+            // Draw the visible map tiles
+            for (int worldY = startY; worldY < endY; worldY++)
             {
-                for (int y = 0; y < map.Height; y++)
+                for (int worldX = startX; worldX < endX; worldX++)
                 {
-                    // Only draw what's visible in the viewport
-                    // Apply shake offset to rendering positions
-                    int drawX = x + shakeOffset.X;
-                    int drawY = y + shakeOffset.Y;
+                    // Convert to screen coordinates
+                    int screenX = worldX - startX;
+                    int screenY = worldY - startY;
                     
-                    if (drawX >= bounds.X && drawX < bounds.X + bounds.Width &&
-                        drawY >= bounds.Y && drawY < bounds.Y + bounds.Height)
+                    // Apply shake offset
+                    int drawX = screenX + shakeOffset.X;
+                    int drawY = screenY + shakeOffset.Y;
+                    
+                    // Only draw if within bounds
+                    if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
                     {
-                        var tile = map.Tiles[x, y];
-                        var symbol = tile.Symbol;
+                        var tile = map.Tiles[worldX, worldY];
                         
-                        Driver.SetAttribute(GetTileColor(tile));
-                        AddRune(drawX, drawY, (Rune)symbol);
+                        // Use the rich tile data for rendering
+                        Terminal.Gui.Attribute tileAttr;
+                        
+                        try
+                        {
+                            // Parse colors from strings
+                            var fg = Enum.Parse<Color>(tile.ForegroundColor);
+                            var bg = Enum.Parse<Color>(tile.BackgroundColor);
+                            tileAttr = new Terminal.Gui.Attribute(fg, bg);
+                        }
+                        catch
+                        {
+                            // Fallback if color parsing fails
+                            tileAttr = GetTileColor(tile);
+                        }
+                        
+                        Driver.SetAttribute(tileAttr);
+                        
+                        // Use rich foreground character if available
+                        if (!string.IsNullOrEmpty(tile.Foreground) && tile.Foreground.Length > 0)
+                        {
+                            AddRune(drawX, drawY, (Rune)tile.Foreground[0]);
+                        }
+                        else
+                        {
+                            // Use explicit method to get the symbol to avoid ambiguity
+                            char symbol = GetTileSymbol(tile);
+                            AddRune(drawX, drawY, (Rune)symbol);
+                        }
                     }
                 }
             }
             
-            // Draw dropped items with shake offset
+            // Draw dropped items
             foreach (var item in _gameState.DroppedItems)
             {
-                // Get item render dimensions
-                var (itemX, itemY, width, height) = item.GetRenderDimensions();
+                // Convert to screen coordinates
+                var (screenX, screenY) = WorldToScreen(item.Position.X, item.Position.Y);
                 
                 // Apply shake offset
-                itemX += shakeOffset.X;
-                itemY += shakeOffset.Y;
+                int drawX = screenX + shakeOffset.X;
+                int drawY = screenY + shakeOffset.Y;
                 
                 // Only draw item if within viewport
-                if (itemX + width > bounds.X && itemX < bounds.X + bounds.Width &&
-                    itemY + height > bounds.Y && itemY < bounds.Y + bounds.Height)
+                if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
                 {
-                    DrawItem(item, shakeOffset);
+                    DrawItem(item, drawX, drawY);
                 }
             }
             
-            // Draw all enemies with shake offset
+            // Draw all enemies
             foreach (var enemy in _gameState.Enemies)
             {
-                // Get enemy render dimensions
-                var (enemyX, enemyY, width, height) = enemy.GetRenderDimensions();
+                if (!enemy.IsAlive) continue;
+                
+                // Convert to screen coordinates
+                var (screenX, screenY) = WorldToScreen(enemy.Position.X, enemy.Position.Y);
                 
                 // Apply shake offset
-                enemyX += shakeOffset.X;
-                enemyY += shakeOffset.Y;
+                int drawX = screenX + shakeOffset.X;
+                int drawY = screenY + shakeOffset.Y;
                 
                 // Only draw enemy if within viewport
-                if (enemyX + width > bounds.X && enemyX < bounds.X + bounds.Width &&
-                    enemyY + height > bounds.Y && enemyY < bounds.Y + bounds.Height)
+                var (_, _, width, height) = enemy.GetRenderDimensions();
+                if (drawX + width > 0 && drawX < bounds.Width && 
+                    drawY + height > 0 && drawY < bounds.Height)
                 {
                     // Draw selection indicators if this is the selected enemy
                     if (_selectedEnemy == enemy)
                     {
-                        DrawSelectionIndicator(enemy, shakeOffset);
+                        DrawSelectionIndicator(enemy, drawX, drawY, width, height);
                     }
                     
                     // Draw the enemy
-                    DrawCreature(enemy, true, shakeOffset);
+                    DrawCreature(enemy, true, drawX, drawY);
                 }
             }
             
-            // Draw the player with shake offset
-            DrawCreature(_gameState.Player, false, shakeOffset);
+            // Draw the player (always centered)
+            int playerScreenX = bounds.Width / 2;
+            int playerScreenY = bounds.Height / 2;
             
-            // Draw damage numbers for creatures with shake offset
+            // Apply shake offset
+            int playerDrawX = playerScreenX + shakeOffset.X;
+            int playerDrawY = playerScreenY + shakeOffset.Y;
+            
+            // Draw the player
+            DrawCreature(_gameState.Player, false, playerDrawX, playerDrawY);
+            
+            // Draw damage numbers
             foreach (var enemy in _gameState.Enemies)
             {
                 if (enemy.ActiveDamageNumbers.Count > 0)
                 {
-                    DrawDamageNumbers(enemy, shakeOffset);
+                    foreach (var damageNumber in enemy.ActiveDamageNumbers)
+                    {
+                        // Convert to screen coordinates
+                        var (screenX, screenY) = WorldToScreen(damageNumber.Position.X, 
+                            (int)(damageNumber.Position.Y - damageNumber.YOffset));
+                        
+                        // Apply shake offset
+                        int drawX = screenX + shakeOffset.X;
+                        int drawY = screenY + shakeOffset.Y;
+                        
+                        if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
+                        {
+                            DrawDamageNumber(damageNumber.Value, drawX, drawY);
+                        }
+                    }
                 }
             }
             
-            // Draw player damage numbers with shake offset
+            // Draw player damage numbers
             if (_gameState.Player.ActiveDamageNumbers.Count > 0)
             {
-                DrawDamageNumbers(_gameState.Player, shakeOffset);
+                foreach (var damageNumber in _gameState.Player.ActiveDamageNumbers)
+                {
+                    // Player is always centered, so damage numbers are relative to center
+                    int drawX = playerScreenX + shakeOffset.X;
+                    int drawY = (int)(playerScreenY - damageNumber.YOffset) + shakeOffset.Y;
+                    
+                    if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
+                    {
+                        DrawDamageNumber(damageNumber.Value, drawX, drawY);
+                    }
+                }
             }
             
-            // Draw particles with shake offset
+            // Draw particles
             foreach (var particle in _particles)
             {
-                int drawX = particle.X + shakeOffset.X;
-                int drawY = particle.Y + shakeOffset.Y;
+                // Convert to screen coordinates
+                var (screenX, screenY) = WorldToScreen(particle.X, particle.Y);
                 
-                // Make sure we're within map bounds
-                if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
-                    drawY >= 0 && drawY < _gameState.CurrentMap.Height)
+                // Apply shake offset
+                int drawX = screenX + shakeOffset.X;
+                int drawY = screenY + shakeOffset.Y;
+                
+                // Draw if within bounds
+                if (drawX >= 0 && drawX < bounds.Width && drawY >= 0 && drawY < bounds.Height)
                 {
                     Driver.SetAttribute(new Terminal.Gui.Attribute(particle.Color, Color.Black));
                     AddRune(drawX, drawY, (Rune)particle.Symbol);
                 }
             }
             
-            // Draw all active animations on top with shake offset
+            // Draw all active animations
             foreach (var animation in _gameState.ActiveAnimations)
             {
-                animation.Draw(this, shakeOffset);
-            }
-        }
-        
-        private void DrawDamageNumbers(Creature creature, AsciiAscendant.Core.Point shakeOffset)
-        {
-            foreach (var damageNumber in creature.ActiveDamageNumbers)
-            {
-                // Calculate position with rising effect
-                int x = damageNumber.Position.X + shakeOffset.X;
-                int y = (int)(damageNumber.Position.Y - damageNumber.YOffset) + shakeOffset.Y;
+                // Convert to screen coordinates and draw with viewport adjustment
+                var (animScreenX, animScreenY) = WorldToScreen(animation.Position.X, animation.Position.Y);
                 
-                // Make sure we're within map bounds
-                if (x >= 0 && x < _gameState.CurrentMap.Width && 
-                    y >= 0 && y < _gameState.CurrentMap.Height)
-                {
-                    // Convert damage to string and calculate width for centering
-                    string damageText = damageNumber.Value.ToString();
-                    int textWidth = damageText.Length;
-                    int startX = x - (textWidth / 2);
-                    
-                    // Draw with red color for visible damage
-                    Driver.SetAttribute(new Terminal.Gui.Attribute(Color.BrightRed, Color.Black));
-                    
-                    // Draw each character
-                    for (int i = 0; i < damageText.Length; i++)
-                    {
-                        int drawX = startX + i;
-                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width)
-                        {
-                            AddRune(drawX, y, (Rune)damageText[i]);
-                        }
-                    }
-                }
+                animation.DrawAtViewportCoordinates(this, animScreenX + shakeOffset.X, animScreenY + shakeOffset.Y);
             }
         }
         
-        private void DrawCreature(Creature creature, bool isEnemy, AsciiAscendant.Core.Point shakeOffset)
+        private void DrawDamageNumber(int damage, int x, int y)
         {
-            // Get creature render dimensions
-            var (x, y, width, height) = creature.GetRenderDimensions();
+            // Convert damage to string and calculate width for centering
+            string damageText = damage.ToString();
+            int textWidth = damageText.Length;
+            int startX = x - (textWidth / 2);
             
-            // Apply shake offset
-            x += shakeOffset.X;
-            y += shakeOffset.Y;
+            // Draw with red color for visible damage
+            Driver.SetAttribute(new Terminal.Gui.Attribute(Color.BrightRed, Color.Black));
             
+            // Draw each character
+            for (int i = 0; i < damageText.Length; i++)
+            {
+                AddRune(startX + i, y, (Rune)damageText[i]);
+            }
+        }
+        
+        private void DrawCreature(Creature creature, bool isEnemy, int screenX, int screenY)
+        {
             // Use the entity's own color method
             Driver.SetAttribute(creature.GetEntityColor());
             
@@ -310,45 +389,30 @@ namespace AsciiAscendant.UI
                     string line = currentAscii[yOffset];
                     for (int xOffset = 0; xOffset < line.Length; xOffset++)
                     {
-                        int drawX = x + xOffset;
-                        int drawY = y + yOffset;
+                        int drawX = screenX + xOffset;
+                        int drawY = screenY + yOffset;
                         
-                        // Make sure we're within map bounds
-                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
-                            drawY >= 0 && drawY < _gameState.CurrentMap.Height)
-                        {
-                            AddRune(drawX, drawY, (Rune)line[xOffset]);
-                        }
+                        AddRune(drawX, drawY, (Rune)line[xOffset]);
                     }
                 }
                 
-                // Draw health bar for creatures - moved up by one additional row (y-2 instead of y-1)
+                // Draw health bar for creatures - moved up by one additional row
                 float healthPercentage = creature.GetHealthPercentage();
-                DrawHealthBar(creature.Position.X + shakeOffset.X, y - 2, healthPercentage, creature.Name);
+                DrawHealthBar(screenX + currentAscii[0].Length / 2, screenY - 2, healthPercentage, creature.Name);
             }
             else
             {
                 // Fallback to single character if no ASCII representation
-                if (x >= 0 && x < _gameState.CurrentMap.Width && y >= 0 && y < _gameState.CurrentMap.Height)
-                {
-                    AddRune(x, y, (Rune)creature.Symbol);
-                    
-                    // Draw health bar for single-character creatures - moved up by one row
-                    float healthPercentage = creature.GetHealthPercentage();
-                    DrawHealthBar(x, y - 2, healthPercentage, creature.Name);
-                }
+                AddRune(screenX, screenY, (Rune)creature.Symbol);
+                
+                // Draw health bar for single-character creatures
+                float healthPercentage = creature.GetHealthPercentage();
+                DrawHealthBar(screenX, screenY - 2, healthPercentage, creature.Name);
             }
         }
         
-        private void DrawItem(Item item, AsciiAscendant.Core.Point shakeOffset)
+        private void DrawItem(Item item, int screenX, int screenY)
         {
-            // Get item render dimensions
-            var (x, y, width, height) = item.GetRenderDimensions();
-            
-            // Apply shake offset
-            x += shakeOffset.X;
-            y += shakeOffset.Y;
-            
             // Use the item's own color method
             Driver.SetAttribute(item.GetEntityColor());
             
@@ -361,113 +425,73 @@ namespace AsciiAscendant.UI
                     string line = currentAscii[yOffset];
                     for (int xOffset = 0; xOffset < line.Length; xOffset++)
                     {
-                        int drawX = x + xOffset;
-                        int drawY = y + yOffset;
-                        
-                        // Make sure we're within map bounds
-                        if (drawX >= 0 && drawX < _gameState.CurrentMap.Width && 
-                            drawY >= 0 && drawY < _gameState.CurrentMap.Height)
-                        {
-                            AddRune(drawX, drawY, (Rune)line[xOffset]);
-                        }
+                        AddRune(screenX + xOffset, screenY + yOffset, (Rune)line[xOffset]);
                     }
                 }
             }
             else
             {
                 // Fallback to single character if no ASCII representation
-                if (x >= 0 && x < _gameState.CurrentMap.Width && y >= 0 && y < _gameState.CurrentMap.Height)
-                {
-                    AddRune(x, y, (Rune)item.Symbol);
-                }
+                AddRune(screenX, screenY, (Rune)item.Symbol);
             }
         }
         
-        private void DrawSelectionIndicator(Entity entity, AsciiAscendant.Core.Point shakeOffset)
+        private void DrawSelectionIndicator(Entity entity, int screenX, int screenY, int width, int height)
         {
-            var (x, y, width, height) = entity.GetRenderDimensions();
-            
-            // Apply shake offset
-            x += shakeOffset.X;
-            y += shakeOffset.Y;
-            
             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
             
             var currentAscii = entity.CurrentAscii;
             if (currentAscii != null && currentAscii.Count > 0)
             {
                 // Draw selection brackets to the left and right
-                int leftX = x - 2;
-                int rightX = x + width + 1;
+                int leftX = screenX - 2;
+                int rightX = screenX + width + 1;
                 
                 for (int yOffset = 0; yOffset < height; yOffset++)
                 {
-                    int drawY = y + yOffset;
+                    int drawY = screenY + yOffset;
                     
                     // Draw left bracket
-                    if (leftX >= 0 && leftX < _gameState.CurrentMap.Width && 
-                        drawY >= 0 && drawY < _gameState.CurrentMap.Height)
-                    {
-                        AddRune(leftX, drawY, (Rune)'[');
-                    }
+                    AddRune(leftX, drawY, (Rune)'[');
                     
                     // Draw right bracket
-                    if (rightX >= 0 && rightX < _gameState.CurrentMap.Width && 
-                        drawY >= 0 && drawY < _gameState.CurrentMap.Height)
-                    {
-                        AddRune(rightX, drawY, (Rune)']');
-                    }
+                    AddRune(rightX, drawY, (Rune)']');
                 }
             }
             else
             {
                 // Draw selection brackets to the left and right for single-character entities
-                if (x - 1 >= 0 && x - 1 < _gameState.CurrentMap.Width)
-                    AddRune(x - 1, y, (Rune)'[');
-                
-                if (x + 1 >= 0 && x + 1 < _gameState.CurrentMap.Width)
-                    AddRune(x + 1, y, (Rune)']');
+                AddRune(screenX - 1, screenY, (Rune)'[');
+                AddRune(screenX + 1, screenY, (Rune)']');
             }
         }
         
-        private void DrawHealthBar(int x, int y, float percentage, string name)
+        private void DrawHealthBar(int screenX, int screenY, float percentage, string name)
         {
-            if (y < 0 || y >= _gameState.CurrentMap.Height) return;
-            
             // Draw creature name
             string nameDisplay = name.Length <= 10 ? name : name.Substring(0, 10);
             Driver.SetAttribute(new Terminal.Gui.Attribute(Color.White, Color.Black));
             
             // Center the name above the entity
-            int nameX = x - (nameDisplay.Length / 2);
+            int nameX = screenX - (nameDisplay.Length / 2);
             for (int i = 0; i < nameDisplay.Length; i++)
             {
-                int drawX = nameX + i;
-                if (drawX >= 0 && drawX < _gameState.CurrentMap.Width)
-                {
-                    AddRune(drawX, y, (Rune)nameDisplay[i]);
-                }
+                AddRune(nameX + i, screenY, (Rune)nameDisplay[i]);
             }
             
             // Draw health bar below the name
-            if (y + 1 < _gameState.CurrentMap.Height)
+            int barWidth = 7;
+            int filledWidth = (int)(barWidth * percentage);
+            
+            // Health bar color based on health percentage
+            var healthBarColor = GetHealthBarColor(percentage);
+            
+            for (int i = 0; i < barWidth; i++)
             {
-                int barWidth = 7;
-                int filledWidth = (int)(barWidth * percentage);
-                
-                // Health bar color based on health percentage
-                var healthBarColor = GetHealthBarColor(percentage);
-                
-                for (int i = 0; i < barWidth; i++)
-                {
-                    int drawX = x - (barWidth / 2) + i;
-                    if (drawX >= 0 && drawX < _gameState.CurrentMap.Width)
-                    {
-                        char barChar = i < filledWidth ? '█' : '░';
-                        Driver.SetAttribute(healthBarColor);
-                        AddRune(drawX, y + 1, (Rune)barChar);
-                    }
-                }
+                int drawX = screenX - (barWidth / 2) + i;
+                char barChar = i < filledWidth ? '█' : '░';
+                Driver.SetAttribute(healthBarColor);
+                AddRune(drawX, screenY + 1, (Rune)barChar);
             }
         }
         
@@ -505,16 +529,42 @@ namespace AsciiAscendant.UI
             return skill.IsInRange(_gameState.Player.Position, _selectedEnemy.Position);
         }
         
+        // Fallback tile color logic when rich colors aren't available
         private Terminal.Gui.Attribute GetTileColor(Tile tile)
         {
-            return tile.Type switch
+            return tile.TileType switch
             {
                 TileType.Floor => new Terminal.Gui.Attribute(Color.Gray, Color.Black),
                 TileType.Wall => new Terminal.Gui.Attribute(Color.White, Color.Black),
                 TileType.Door => new Terminal.Gui.Attribute(Color.BrightYellow, Color.Black),
                 TileType.Water => new Terminal.Gui.Attribute(Color.Blue, Color.Black),
+                TileType.Obstacle => new Terminal.Gui.Attribute(Color.DarkGray, Color.Black),
                 _ => new Terminal.Gui.Attribute(Color.White, Color.Black)
             };
+        }
+        
+        // Helper method to avoid ambiguity with the Symbol property
+        private char GetTileSymbol(Tile tile)
+        {
+            switch (tile.TileType)
+            {
+                case TileType.Floor: return ' ';
+                case TileType.Wall: return '#';
+                case TileType.Door: return '+';
+                case TileType.Water: return '~';
+                case TileType.Obstacle: return 'o';
+                default: return ' ';
+            }
+        }
+    }
+    
+    // Enhanced animation draw interface for the scrolling viewport
+    public static class AnimationExtensions
+    {
+        public static void DrawAtViewportCoordinates(this Animation animation, MapView view, int screenX, int screenY)
+        {
+            // Draw the animation at viewport coordinates
+            animation.DrawAtPosition(view, new AsciiAscendant.Core.Point(screenX, screenY));
         }
     }
     
