@@ -13,6 +13,7 @@ namespace AsciiAscendant.Engine
         private Timer _gameLoopTimer = null!;
         private const int GameTickIntervalMs = 100; // Update game every 100ms
         private bool _gameRunning = false;
+        private bool _gamePaused = true; // Start the game in paused state
         
         // Track enemy update timing - enemies should update once per second
         private int _enemyUpdateCounter = 0;
@@ -37,6 +38,9 @@ namespace AsciiAscendant.Engine
             
             // Initialize the game loop timer
             _gameLoopTimer = new Timer(GameLoopCallback, null, Timeout.Infinite, Timeout.Infinite);
+            
+            // Show controls help dialog on startup
+            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(200), ShowHelpDialog);
         }
 
         public void Run()
@@ -65,7 +69,7 @@ namespace AsciiAscendant.Engine
         
         private void GameLoopCallback(object? state)
         {
-            if (!_gameRunning)
+            if (!_gameRunning || _gamePaused)
                 return;
                 
             try
@@ -122,6 +126,45 @@ namespace AsciiAscendant.Engine
             {
                 skill.UpdateCooldown();
             }
+        }
+        
+        // Method to toggle pause state
+        public void TogglePause()
+        {
+            _gamePaused = !_gamePaused;
+        }
+        
+        // Method to show the controls help dialog
+        private bool ShowHelpDialog(MainLoop caller)
+        {
+            var helpDialog = new Dialog("Game Controls", 60, 16);
+            
+            var helpText = new Label(1, 1, @"
+Movement:
+  W, A, S, D - Move the player character
+
+Combat:
+  Mouse Click - Select an enemy target
+  1, 2, 3 - Use skills (when enemy is selected)
+
+Interface:
+  I - Open inventory
+  H - Show this help screen
+
+Press any key to start the game...");
+            
+            helpDialog.Add(helpText);
+            
+            // When the dialog closes, unpause the game
+            helpDialog.KeyPress += (e) => {
+                _gamePaused = false;
+                Application.RequestStop();
+                e.Handled = true;
+            };
+            
+            Application.Run(helpDialog);
+            
+            return false; // Don't repeat this timeout
         }
 
         // Add these P/Invoke methods at the class level

@@ -143,12 +143,23 @@ namespace AsciiAscendant.UI
             return base.MouseEvent(me);
         }
         
+        // Improved version with a more generous hitbox for enemy selection
         private bool IsPointInsideEntity(int x, int y, Entity entity)
         {
             var (entityX, entityY, width, height) = entity.GetRenderDimensions();
             
-            return x >= entityX && x < entityX + width && 
-                   y >= entityY && y < entityY + height;
+            // Add a small buffer around the entity to make selection easier
+            const int selectionBuffer = 2;
+            
+            // Expand the hitbox by the selection buffer
+            int expandedX = entityX - selectionBuffer;
+            int expandedY = entityY - selectionBuffer;
+            int expandedWidth = width + (selectionBuffer * 2);
+            int expandedHeight = height + (selectionBuffer * 2);
+            
+            // Check if the point is within the expanded hitbox
+            return x >= expandedX && x < expandedX + expandedWidth && 
+                   y >= expandedY && y < expandedY + expandedHeight;
         }
         
         // Convert world coordinates to screen coordinates

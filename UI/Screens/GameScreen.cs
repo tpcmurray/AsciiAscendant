@@ -221,7 +221,6 @@ namespace AsciiAscendant.UI
             _processingKeyPress = false;
         }
 
-
         private void GameScreen_KeyUp(KeyEventEventArgs e)
         {
             // Check for Ctrl+Q to quit the game
@@ -235,6 +234,13 @@ namespace AsciiAscendant.UI
             if (e.KeyEvent.Key == Key.i || e.KeyEvent.Key == Key.I)
             {
                 OpenInventory();
+                return;
+            }
+            
+            // Show help screen with 'H' key
+            if (e.KeyEvent.Key == Key.h || e.KeyEvent.Key == Key.H)
+            {
+                ShowHelpScreen();
                 return;
             }
             
@@ -390,6 +396,38 @@ namespace AsciiAscendant.UI
         {
             // Call the MapView's update method to handle screen shake and particles
             _mapView.OnUpdateFrame();
+        }
+
+        // Add method to show the help screen
+        private void ShowHelpScreen()
+        {
+            var helpDialog = new Dialog("Game Controls", 60, 16);
+            
+            var helpText = new Label(1, 1, @"
+Movement:
+  W, A, S, D - Move the player character
+
+Combat:
+  Mouse Click - Select an enemy target
+  1, 2, 3 - Use skills (when enemy is selected)
+
+Interface:
+  I - Open inventory
+  Space - Pick up items (automatic)
+  Ctrl+Q - Quit the game
+  H - Show this help screen
+
+Press any key to continue...");
+            
+            helpDialog.Add(helpText);
+            
+            // When any key is pressed, close the dialog
+            helpDialog.KeyPress += (e) => {
+                Application.RequestStop();
+                e.Handled = true;
+            };
+            
+            Application.Run(helpDialog);
         }
     }
 }
