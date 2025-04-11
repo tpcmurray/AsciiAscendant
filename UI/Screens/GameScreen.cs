@@ -194,16 +194,20 @@ namespace AsciiAscendant.UI
             switch (e.KeyEvent.Key)
             {
                 case Key.w:
+                    // Up - normal 1 cell movement
                     _gameState.Player.Move(_gameState.CurrentMap, 0, -1);
                     break;
                 case Key.a:
-                    _gameState.Player.Move(_gameState.CurrentMap, -1, 0);
+                    // Left - 2 cells at a time
+                    _gameState.Player.Move(_gameState.CurrentMap, -2, 0);
                     break;
                 case Key.s:
+                    // Down - normal 1 cell movement
                     _gameState.Player.Move(_gameState.CurrentMap, 0, 1);
                     break;
                 case Key.d:
-                    _gameState.Player.Move(_gameState.CurrentMap, 1, 0);
+                    // Right - 2 cells at a time
+                    _gameState.Player.Move(_gameState.CurrentMap, 2, 0);
                     break;
                 case Key.D1:
                 case Key.D2:
@@ -405,7 +409,8 @@ namespace AsciiAscendant.UI
             
             var helpText = new Label(1, 1, @"
 Movement:
-  W, A, S, D - Move the player character
+  W, S   - Move up/down (1 cell at a time)
+  A, D   - Move left/right (2 cells at a time)
 
 Combat:
   Mouse Click - Select an enemy target
